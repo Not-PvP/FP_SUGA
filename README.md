@@ -4,7 +4,7 @@ A brownout notification mobile application that informs users about scheduled an
 
 # Members
 - Mark Angelo L. Florencio
-- Niño Kriebl C. Olmo
+- Niño Kriebel C. Olmo
 
 # Features
 - View the current power status of a selected area
