@@ -1,6 +1,10 @@
-# suga
+# SUGA
 
-A new Flutter project.
+Brownout Notifier that will use push notification, web notification, or SMS notification.
+
+# Members
+- Mark Angelo L. Florencio
+- [partner]
 
 ## Getting Started
 
