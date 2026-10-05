@@ -1,10 +1,18 @@
 # SUGA
 
-Brownout Notifier that will use push notification, web notification, or SMS notification.
+A brownout notification mobile application that informs users about scheduled and ongoing power interruptions in their area through push notifications or SMS notification.
 
 # Members
 - Mark Angelo L. Florencio
-- [partner]
+- Niño Kriebl C. Olmo
+
+# Features
+- View the current power status of a selected area
+- Browse different areas and their power status
+- View scheduled brownouts and their details
+- Receive push notifications about power interruptions and updates
+- View affected areas and feeders
+- Check estimated restoration times
 
 ## Getting Started
 
