@@ -15,6 +15,7 @@ class AreasScreen extends StatelessWidget {
             Navigator.pushNamed(
               context,
               '/area_details',
+              arguments: 'Jaro',
             );
           },
           child: const Text('View Area Details'),

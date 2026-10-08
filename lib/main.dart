@@ -1,10 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/dashboard_screen.dart';
-import 'screens/brownout_details_screen.dart';
-import 'screens/scheduled_brownouts_screen.dart';
-import 'screens/notifications_screen.dart';
-import 'screens/areas_screen.dart';
-import 'screens/area_details_screen.dart';
+import 'routes/app_routes.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,14 +15,7 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
-      routes: {
-        '/': (context) => const DashboardScreen(),
-        '/areas': (context) => const AreasScreen(),
-        '/area_details': (context) => const AreaDetailsScreen(),
-        '/brownouts': (context) => const ScheduledBrownoutsScreen(),
-        '/brownout_details': (context) => const BrownoutDetailsScreen(),
-        '/notifications': (context) => const NotificationsScreen(),
-      }
+      routes: AppRoutes.routes,
     );
   }
 }

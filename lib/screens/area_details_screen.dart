@@ -5,12 +5,13 @@ class AreaDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final area = ModalRoute.of(context)?.settings.arguments as String;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Area Details'),
       ),
-      body: const Center(
-        child: Text('Area Details'),
+      body: Center(
+        child: Text(area),
       ),
     );
   }

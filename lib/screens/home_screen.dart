@@ -5,9 +5,34 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Dashboard'),
+      ),
       body: Center(
-        child: Text('Home Screen'),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/areas');
+              },
+              child: const Text('Go to Areas'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/brownouts');
+              },
+              child: const Text('Go to Scheduled Brownouts'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pushNamed(context, '/notifications');
+              },
+              child: const Text('Go to Notifications'),
+            ),
+          ],
+        ),
       ),
     );
   }
