@@ -22,6 +22,8 @@ npm run db:verify           # check create, read, update and delete
 | --- | --- |
 | `DATABASE_URL` | `file:./data/suga.db` for local development, or `libsql://<name>.turso.io` for Turso |
 | `DATABASE_AUTH_TOKEN` | Turso auth token. Leave empty for a local file. |
+| `PORT` | API port. Defaults to 3000. |
+| `ADMIN_API_KEY` | Secret for admin routes, sent as the `x-api-key` header. If unset, admin routes return 503. |
 
 `.env` is ignored by git, so the token never reaches the public repository.
 
@@ -32,7 +34,23 @@ npm run db:verify           # check create, read, update and delete
 | `npm run db:migrate` | Creates any missing tables. Safe to run again. |
 | `npm run db:seed` | Adds starting data. Safe to run again; existing rows are skipped. |
 | `npm run db:reset` | Drops every table, recreates them and reseeds. **Deletes all data.** |
+| `npm start` | Starts the API (`npm run dev` restarts on file changes). |
+| `npm run test:api` | Checks the area endpoints against the real database, using a temporary test area. |
 | `npm run db:verify` | Runs create, read, update and delete checks using temporary test rows. |
+
+## Area API
+
+Success: `{ "success": true, "data": ... }` (the list also has `count`). Error: `{ "success": false, "error": { "code", "message", "details?" } }`.
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/api/areas` | none | List areas. Optional `?search=` (name or city, partial) and `?city=` (exact). |
+| GET | `/api/areas/:id` | none | One area, with its feeders. |
+| POST | `/api/areas` | admin | Create. Body: `name`, `city`, `latitude`, `longitude`. Returns 201. |
+| PATCH | `/api/areas/:id` | admin | Update any of those fields. |
+| DELETE | `/api/areas/:id` | admin | Delete the area, its feeders and interruption links. Returns 204. |
+
+Status codes: 400 invalid input or id, 401 missing or wrong key, 404 not found, 409 duplicate name in the same city (ignoring case), 503 admin key not configured.
 
 ## Schema
 
@@ -72,6 +90,10 @@ backend/
     │   ├── seed-data.js        starting data
     │   ├── seed.js             inserts the starting data
     │   └── verify.js           CRUD checks
+    ├── app.js, index.js        Express app and server start
+    ├── routes/                 area endpoints
+    ├── middleware/             admin key check, error responses
+    ├── validation/             area input checks
     └── repositories/
         ├── areaRepository.js           areas and feeders
         └── interruptionRepository.js   power interruptions
