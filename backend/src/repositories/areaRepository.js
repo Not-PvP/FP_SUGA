@@ -16,9 +16,34 @@ function toFeeder(row) {
   return { id: Number(row.id), area_id: Number(row.area_id), name: row.name };
 }
 
-export async function findAllAreas() {
-  const result = await db.execute('SELECT * FROM areas ORDER BY name');
+// `search` matches part of the name or city; `city` must match exactly. Both ignore case.
+export async function findAllAreas({ search, city } = {}) {
+  const where = [];
+  const args = [];
+  if (search) {
+    where.push("(name LIKE ? ESCAPE '\\' OR city LIKE ? ESCAPE '\\')");
+    const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
+    args.push(pattern, pattern);
+  }
+  if (city) {
+    where.push('city = ? COLLATE NOCASE');
+    args.push(city);
+  }
+  const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const result = await db.execute({
+    sql: `SELECT * FROM areas ${clause} ORDER BY name, city`,
+    args,
+  });
   return result.rows.map(toArea);
+}
+
+// Finds an area with the same name and city, ignoring case. Used to reject duplicates.
+export async function findAreaByNameAndCity(name, city) {
+  const result = await db.execute({
+    sql: 'SELECT * FROM areas WHERE name = ? COLLATE NOCASE AND city = ? COLLATE NOCASE',
+    args: [name, city],
+  });
+  return result.rows.length ? toArea(result.rows[0]) : null;
 }
 
 // Returns the area with its feeders, or null if it does not exist.
