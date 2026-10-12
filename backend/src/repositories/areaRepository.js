@@ -95,3 +95,25 @@ export async function createFeeder({ areaId, name }) {
   });
   return toFeeder(result.rows[0]);
 }
+
+const placeholders = (list) => list.map(() => '?').join(', ');
+
+// Returns which of the given area ids exist. Used to validate interruption links.
+export async function findAreaIds(ids) {
+  if (ids.length === 0) return [];
+  const result = await db.execute({
+    sql: `SELECT id FROM areas WHERE id IN (${placeholders(ids)})`,
+    args: ids,
+  });
+  return result.rows.map((row) => Number(row.id));
+}
+
+// Returns { id, areaId } for each of the given feeder ids that exists.
+export async function findFeedersByIds(ids) {
+  if (ids.length === 0) return [];
+  const result = await db.execute({
+    sql: `SELECT id, area_id FROM feeders WHERE id IN (${placeholders(ids)})`,
+    args: ids,
+  });
+  return result.rows.map((row) => ({ id: Number(row.id), areaId: Number(row.area_id) }));
+}

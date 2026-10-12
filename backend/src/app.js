@@ -1,11 +1,12 @@
 import express from 'express';
 import { areasRouter } from './routes/areas.js';
 import { interruptionsRouter } from './routes/interruptions.js';
-import { errorHandler, notFound } from './middleware/errors.js';
+import { errorHandler, notFound, requireJsonBody } from './middleware/errors.js';
 
 export function createApp() {
   const app = express();
-  app.use(express.json());
+  app.use(requireJsonBody);
+  app.use(express.json({ limit: '100kb' }));
 
   app.get('/api/health', (_req, res) => res.json({ success: true, data: { status: 'ok' } }));
   app.use('/api/areas', areasRouter);
