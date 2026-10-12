@@ -1,10 +1,12 @@
 import express from 'express';
 import { areasRouter } from './routes/areas.js';
 import { interruptionsRouter } from './routes/interruptions.js';
+import { cors } from './middleware/cors.js';
 import { errorHandler, notFound, requireJsonBody } from './middleware/errors.js';
 
 export function createApp() {
   const app = express();
+  app.use(cors);
   app.use(requireJsonBody);
   app.use(express.json({ limit: '100kb' }));
 

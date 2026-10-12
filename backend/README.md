@@ -24,6 +24,7 @@ npm run db:verify           # check create, read, update and delete
 | `DATABASE_AUTH_TOKEN` | Turso auth token. Leave empty for a local file. |
 | `PORT` | API port. Defaults to 3000. |
 | `ADMIN_API_KEY` | Secret for admin routes, sent as the `x-api-key` header. If unset, admin routes return 503. |
+| `CORS_ORIGIN` | Origins allowed to call the API from a browser (the Flutter web build), comma separated. Unset or `*` allows any origin. |
 
 `.env` is ignored by git, so the token never reaches the public repository.
 

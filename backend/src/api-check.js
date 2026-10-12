@@ -110,6 +110,20 @@ try {
   assert.deepEqual(Object.keys(r.body), ['success', 'error']);
   pass('unknown route -> 404 with the error shape');
 
+  let res = await fetch(`${root}/areas`, { headers: { origin: 'http://localhost:51428' } });
+  assert.equal(res.headers.get('access-control-allow-origin'), '*');
+  res = await fetch(`${root}/interruptions`, {
+    method: 'OPTIONS',
+    headers: {
+      origin: 'http://localhost:51428',
+      'access-control-request-method': 'POST',
+      'access-control-request-headers': 'content-type, x-api-key',
+    },
+  });
+  assert.equal(res.status, 204);
+  assert.match(res.headers.get('access-control-allow-headers'), /x-api-key/);
+  pass('CORS headers and preflight for the Flutter web build');
+
   // ---------- Interruptions: reads ----------
   r = await request('/interruptions');
   assert.equal(r.status, 200);
