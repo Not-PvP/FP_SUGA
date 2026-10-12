@@ -23,22 +23,23 @@ class PowerInterruption {
     this.estimatedRestorationTime,
   });
 
+  // Accepts the backend's snake_case keys as well as the camelCase keys from toJson().
   factory PowerInterruption.fromJson(Map<String, dynamic> json) {
     return PowerInterruption(
       id: json['id']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
       date: json['date']?.toString() ?? '',
-      startTime: json['startTime']?.toString() ?? '',
-      endTime: json['endTime']?.toString() ?? '',
-      affectedAreas: (json['affectedAreas'] as List<dynamic>?)
+      startTime: (json['start_time'] ?? json['startTime'])?.toString() ?? '',
+      endTime: (json['end_time'] ?? json['endTime'])?.toString() ?? '',
+      affectedAreas: ((json['affected_areas'] ?? json['affectedAreas']) as List<dynamic>?)
               ?.map((area) => area.toString())
               .toList() ??
           [],
       reason: json['reason']?.toString() ?? '',
       status: json['status']?.toString() ?? '',
       estimatedRestorationTime:
-          json['estimatedRestorationTime']?.toString(),
+          (json['estimated_restoration'] ?? json['estimatedRestorationTime'])?.toString(),
     );
   }
 

@@ -50,6 +50,15 @@ Success: `{ "success": true, "data": ... }` (the list also has `count`). Error: 
 | PATCH | `/api/areas/:id` | admin | Update any of those fields. |
 | DELETE | `/api/areas/:id` | admin | Delete the area, its feeders and interruption links. Returns 204. |
 
+## Interruption API
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| GET | `/api/interruptions` | none | List interruptions, soonest first. Optional `?area_id=` for one area. |
+| GET | `/api/interruptions/:id` | none | One interruption, with its affected areas and feeders. |
+
+Each item uses snake_case keys: `id`, `title`, `description`, `affected_areas`, `area_ids`, `feeders`, `feeder_ids`, `date` (YYYY-MM-DD), `start_time`, `end_time` (HH:MM), `reason`, `status`, `estimated_restoration`.
+
 Status codes: 400 invalid input or id, 401 missing or wrong key, 404 not found, 409 duplicate name in the same city (ignoring case), 503 admin key not configured.
 
 ## Schema

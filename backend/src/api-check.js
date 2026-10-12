@@ -54,6 +54,30 @@ try {
   r = await call(`/${id}`, { method: 'PATCH', headers: admin, body: '{}' });
   assert.equal(r.status, 400);
   pass('partial update; empty update -> 400');
+
+  const interruptionsUrl = base.replace('/areas', '/interruptions');
+  const get = async (path) => {
+    const res = await fetch(interruptionsUrl + path);
+    return { status: res.status, body: await res.json() };
+  };
+  r = await get('');
+  assert.equal(r.status, 200);
+  assert.equal(r.body.count, r.body.data.length);
+  const sample = r.body.data[0];
+  assert.ok(sample, 'seed data should include an interruption');
+  assert.ok(Array.isArray(sample.affected_areas) && sample.start_time && sample.status);
+  pass('list interruptions');
+
+  r = await get(`/${sample.id}`);
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.id, sample.id);
+  r = await get('/999999');
+  assert.equal(r.status, 404);
+  r = await get('/abc');
+  assert.equal(r.status, 400);
+  r = await get('?area_id=abc');
+  assert.equal(r.status, 400);
+  pass('interruption by id; missing -> 404; bad id -> 400');
 } finally {
   if (id) {
     const r = await call(`/${id}`, { method: 'DELETE', headers: admin });
