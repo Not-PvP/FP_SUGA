@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'providers/power_interruption_provider.dart';
 import 'routes/app_routes.dart';
 
 void main() {
@@ -10,12 +12,18 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'SUGA',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+    // Providers above MaterialApp are shared by every screen and route.
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => PowerInterruptionProvider()),
+      ],
+      child: MaterialApp(
+        title: 'SUGA',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        ),
+        routes: AppRoutes.routes,
       ),
-      routes: AppRoutes.routes,
     );
   }
 }

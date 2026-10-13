@@ -10,6 +10,9 @@ class InterruptionService {
 
   final ApiClient _api;
 
+  // Needed for create, update and delete. Set after the admin logs in.
+  set adminKey(String? key) => _api.adminKey = key;
+
   // Pass [areaId] to get only the interruptions that affect that area.
   Future<List<PowerInterruption>> fetchInterruptions({int? areaId}) async {
     final body = await _api.get('/api/interruptions', query: {
@@ -25,4 +28,17 @@ class InterruptionService {
     final body = await _api.get('/api/interruptions/$id');
     return PowerInterruption.fromJson(body['data'] as Map<String, dynamic>);
   }
+
+  // Returns the saved interruption, including the id the server gave it.
+  Future<PowerInterruption> createInterruption(PowerInterruption interruption) async {
+    final body = await _api.post('/api/interruptions', interruption.toRequestJson());
+    return PowerInterruption.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<PowerInterruption> updateInterruption(int id, PowerInterruption interruption) async {
+    final body = await _api.patch('/api/interruptions/$id', interruption.toRequestJson());
+    return PowerInterruption.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteInterruption(int id) => _api.delete('/api/interruptions/$id');
 }
