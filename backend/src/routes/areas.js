@@ -4,7 +4,7 @@ import { requireAdmin } from '../middleware/adminAuth.js';
 import { HttpError } from '../middleware/errors.js';
 import { sendItem, sendList } from '../middleware/respond.js';
 import { validateAreaInput } from '../validation/areaValidation.js';
-import { parseId as parseIdAs, queryValue } from '../validation/common.js';
+import { allowOnlyQuery, parseId as parseIdAs, queryValue } from '../validation/common.js';
 
 export const areasRouter = Router();
 
@@ -20,6 +20,7 @@ async function assertNotDuplicate(name, city, ignoreId) {
 
 // GET /api/areas?search=jaro&city=Iloilo City
 areasRouter.get('/', async (req, res) => {
+  allowOnlyQuery(req.query, ['search', 'city'], { q: 'search', name: 'search' });
   const list = await areas.findAllAreas({
     search: queryValue(req.query, 'search'),
     city: queryValue(req.query, 'city'),

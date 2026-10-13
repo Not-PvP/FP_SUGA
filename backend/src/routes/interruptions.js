@@ -3,7 +3,7 @@ import * as interruptions from '../repositories/interruptionRepository.js';
 import { requireAdmin } from '../middleware/adminAuth.js';
 import { HttpError } from '../middleware/errors.js';
 import { sendItem, sendList } from '../middleware/respond.js';
-import { parseId, queryValue } from '../validation/common.js';
+import { allowOnlyQuery, parseId, queryValue } from '../validation/common.js';
 import { assertLinksExist, validateInterruptionInput } from '../validation/interruptionValidation.js';
 
 export const interruptionsRouter = Router();
@@ -18,6 +18,7 @@ async function findOr404(id) {
 
 // GET /api/interruptions?area_id=3
 interruptionsRouter.get('/', async (req, res) => {
+  allowOnlyQuery(req.query, ['area_id'], { areaId: 'area_id', area: 'area_id', areaID: 'area_id' });
   const rawAreaId = queryValue(req.query, 'area_id');
   const areaId = rawAreaId === undefined ? undefined : parseId(rawAreaId, 'area_id');
   sendList(res, await interruptions.findAllInterruptions({ areaId }));

@@ -70,7 +70,7 @@ Every response is JSON with the same shape, so the app can check `success` first
 | 400 | `VALIDATION_ERROR` | A field is missing, has the wrong type or format, is out of range, or the body is not a JSON object. See `details`. |
 | 400 | `INVALID_JSON` | The body could not be parsed as JSON. |
 | 400 | `INVALID_ID` | An id in the path or in `?area_id=` is not a positive integer. |
-| 400 | `INVALID_QUERY` | A query parameter was sent more than once. |
+| 400 | `INVALID_QUERY` | A query parameter is unknown (e.g. `?areaId=` instead of `?area_id=`) or was sent more than once. `details` names the parameter. |
 | 400 | `INVALID_REFERENCE`, `INVALID_DATA` | The database rejected a write that got past validation. Nothing was saved. |
 | 401 | `UNAUTHORIZED` | The `x-api-key` header is missing or wrong on an admin route. |
 | 404 | `NOT_FOUND`, `AREA_NOT_FOUND`, `INTERRUPTION_NOT_FOUND` | The route or record does not exist. |
@@ -81,6 +81,8 @@ Every response is JSON with the same shape, so the app can check `success` first
 | 503 | `ADMIN_DISABLED` | `ADMIN_API_KEY` is not set on the server. |
 
 Admin routes need the header `x-api-key: <ADMIN_API_KEY>`. Requests with a body need `Content-Type: application/json`.
+
+List routes only accept the query parameters listed below. Anything else returns `400 INVALID_QUERY`, so a typo never silently returns the unfiltered list.
 
 ## Area API
 

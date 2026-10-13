@@ -49,6 +49,12 @@ try {
   assert.equal(r.body.error.code, 'INVALID_QUERY');
   pass('repeated query parameter -> 400');
 
+  r = await request('/areas?serch=jaro');
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error.code, 'INVALID_QUERY');
+  assert.ok(r.body.error.details.serch);
+  pass('unknown query parameter -> 400 instead of an unfiltered list');
+
   r = await request('/areas/abc');
   assert.equal(r.status, 400);
   r = await request('/areas/999999');
@@ -133,6 +139,15 @@ try {
   assert.ok(sample, 'seed data should include an interruption');
   assert.ok(Array.isArray(sample.affected_areas) && sample.start_time && sample.status);
   pass('list interruptions');
+
+  r = await request('/interruptions?areaId=1');
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error.code, 'INVALID_QUERY');
+  assert.match(r.body.error.details.areaId, /area_id/);
+  r = await request('/interruptions?area_id=9007199254740993');
+  assert.equal(r.status, 400);
+  assert.equal(r.body.error.code, 'INVALID_ID');
+  pass('camelCase or unknown query -> 400 with a hint; unsafe id -> 400');
 
   r = await request(`/interruptions/${sample.id}`);
   assert.equal(r.status, 200);
