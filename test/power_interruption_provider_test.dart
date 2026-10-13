@@ -31,7 +31,7 @@ http.Response _ok(Object data, [int status = 200]) => http.Response(
 http.Response _error(int status, String message, [Map<String, String>? details]) => http.Response(
       jsonEncode({
         'success': false,
-        'error': {'code': 'ERROR', 'message': message, if (details != null) 'details': details},
+        'error': {'code': 'ERROR', 'message': message, 'details': ?details},
       }),
       status,
     );
