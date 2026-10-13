@@ -1,10 +1,8 @@
 import { HttpError } from '../middleware/errors.js';
+import { cleanText, requireObject } from './common.js';
 
 const MAX_TEXT = 100;
-
-function cleanText(value) {
-  return typeof value === 'string' ? value.trim().replace(/\s+/g, ' ') : value;
-}
+const FIELDS = ['name', 'city', 'latitude', 'longitude'];
 
 function checkText(field, value, errors) {
   if (typeof value !== 'string' || value.length === 0) {
@@ -22,11 +20,13 @@ function checkCoordinate(field, value, limit, errors) {
 
 // Returns cleaned fields. With partial = true, only the fields present are checked (for PATCH).
 export function validateAreaInput(body, { partial = false } = {}) {
-  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
-    throw new HttpError(400, 'VALIDATION_ERROR', 'Request body must be a JSON object');
-  }
+  requireObject(body);
   const errors = {};
   const data = {};
+
+  for (const key of Object.keys(body)) {
+    if (!FIELDS.includes(key)) errors[key] = 'Unknown field';
+  }
 
   for (const field of ['name', 'city']) {
     if (partial && body[field] === undefined) continue;
@@ -39,18 +39,11 @@ export function validateAreaInput(body, { partial = false } = {}) {
     checkCoordinate(field, data[field], limit, errors);
   }
 
-  if (partial && Object.keys(data).length === 0) {
+  if (partial && Object.keys(body).length === 0) {
     errors.body = 'Provide at least one of name, city, latitude, longitude';
   }
   if (Object.keys(errors).length > 0) {
     throw new HttpError(400, 'VALIDATION_ERROR', 'Invalid area data', errors);
   }
   return data;
-}
-
-export function parseId(raw) {
-  if (!/^[1-9]\d*$/.test(raw)) {
-    throw new HttpError(400, 'INVALID_ID', 'Area id must be a positive integer');
-  }
-  return Number(raw);
 }
