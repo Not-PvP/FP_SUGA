@@ -53,6 +53,40 @@ class PowerInterruptionProvider extends ChangeNotifier {
   List<PowerInterruption> interruptionsForArea(int areaId) =>
       _all.where((item) => item.areaIds.contains(areaId)).toList();
 
+  bool hasPowerInArea(int areaId) {
+    final now = DateTime.now();
+
+    return !interruptionsForArea(areaId).any((item) {
+      if (item.status.toLowerCase() != 'active') return false;
+
+      final date = DateTime.tryParse(item.date);
+      final start = item.startTime.split(':');
+      final end = item.endTime.split(':');
+
+      if (date == null || start.length < 2 || end.length < 2) {
+        return false;
+      }
+
+      final startTime = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        int.tryParse(start[0]) ?? 0,
+        int.tryParse(start[1]) ?? 0,
+      );
+
+      final endTime = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        int.tryParse(end[0]) ?? 0,
+        int.tryParse(end[1]) ?? 0,
+      );
+
+      return !now.isBefore(startTime) && now.isBefore(endTime);
+    });
+  }
+
   PowerInterruption? findById(String id) {
     for (final item in _all) {
       if (item.id == id) return item;

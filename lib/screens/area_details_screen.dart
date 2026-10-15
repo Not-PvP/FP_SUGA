@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:suga/models/area.dart';
 import 'package:suga/services/area_service.dart';
+import 'package:provider/provider.dart';
+import 'package:suga/providers/power_interruption_provider.dart';
 
 class AreaDetailsScreen extends StatefulWidget {
   const AreaDetailsScreen({super.key, this.service});
@@ -21,6 +23,11 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
     // Receives the area id from the Areas screen.
     final id = ModalRoute.of(context)!.settings.arguments as int;
     _area ??= _service.fetchArea(id);
+  }
+
+  void _setAsMyArea(Area area) {
+    context.read<PowerInterruptionProvider>().setAreaFilter(area.id);
+    Navigator.popUntil(context, (route) => route.isFirst);
   }
 
   @override
@@ -46,6 +53,10 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
               Text('Feeders', style: Theme.of(context).textTheme.titleMedium),
               if (area.feeders.isEmpty) const Text('No feeders listed'),
               for (final feeder in area.feeders) ListTile(title: Text(feeder.name)),
+              ElevatedButton(
+                onPressed: () => _setAsMyArea(area),
+                child: const Text('Set as My Area'),
+              ),
             ],
           );
         },

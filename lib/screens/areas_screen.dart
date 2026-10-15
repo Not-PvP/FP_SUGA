@@ -65,11 +65,15 @@ class _AreasScreenState extends State<AreasScreen> {
                     title: Text(areas[i].name),
                     subtitle: Text(areas[i].city),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.pushNamed(
-                      context,
-                      AppRoutes.areaDetails,
-                      arguments: areas[i].id,
-                    ),
+                    
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.areaDetails,
+                        arguments: areas[i].id,
+                      );
+                    },
+
                   ),
                 );
               },
