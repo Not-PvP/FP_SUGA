@@ -35,7 +35,7 @@ class HomeScreen extends StatelessWidget {
               // Header
               Row(
                 children: [
-                  // SUGA and greeting on the left
+                  // SUGA and greeting
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -118,7 +118,7 @@ class HomeScreen extends StatelessWidget {
                         color: const Color(0xFF292315),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: const Color(0xFFFFBF00).withOpacity(0.5),
+                          color: const Color(0xFFFFBF00).withValues(alpha: 0.5),
                         ),
                       ),
                       child: const Icon(

@@ -27,7 +27,7 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
 
   void _setAsMyArea(Area area) {
     context.read<PowerInterruptionProvider>().setAreaFilter(area.id);
-    Navigator.popUntil(context, (route) => route.isFirst);
+    Navigator.pop(context);
   }
 
   @override
@@ -47,12 +47,16 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(area.name, style: Theme.of(context).textTheme.headlineMedium),
+              Text(
+                area.name,
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
               Text(area.city),
               const SizedBox(height: 16),
               Text('Feeders', style: Theme.of(context).textTheme.titleMedium),
               if (area.feeders.isEmpty) const Text('No feeders listed'),
-              for (final feeder in area.feeders) ListTile(title: Text(feeder.name)),
+              for (final feeder in area.feeders)
+                ListTile(title: Text(feeder.name)),
               ElevatedButton(
                 onPressed: () => _setAsMyArea(area),
                 child: const Text('Set as My Area'),

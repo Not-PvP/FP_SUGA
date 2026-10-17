@@ -9,7 +9,6 @@ import 'package:suga/screens/brownout_details_screen.dart';
 import 'package:suga/screens/notifications_screen.dart';
 import 'package:suga/screens/main_screen.dart';
 
-
 class AppRoutes {
   static const String home = '/';
   static const String settings = '/settings';
