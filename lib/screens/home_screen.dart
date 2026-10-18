@@ -252,7 +252,9 @@ class HomeScreen extends StatelessWidget {
               
               const SizedBox(height: 28),
 
-              UpcomingAdvisoriesWidget()
+              UpcomingAdvisoriesWidget(
+                areaId: context.watch<PowerInterruptionProvider>().selectedAreaId,
+              )
 
             ],
           ),
