@@ -164,31 +164,43 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                                   ],
                                 ),
                                 if (advisory.feeders.isNotEmpty) ...[
-                                  const SizedBox(height: 10),
+                                  const SizedBox(height: 12),
+                                  const Text(
+                                    'AFFECTED FEEDERS',
+                                    style: TextStyle(
+                                      color: Color(0xFF9CA3AF),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
                                   Wrap(
                                     spacing: 6,
                                     runSpacing: 6,
-                                    children: advisory.feeders.map<Widget>((feeder) {
+                                    children: advisory.feeders.map<Widget>((
+                                      feeder,
+                                    ) {
                                       return Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 10,
                                           vertical: 5,
                                         ),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFF292315),
+                                          color: const Color(0xFF1F2937),
                                           borderRadius: BorderRadius.circular(
-                                            20,
+                                            8,
                                           ),
                                           border: Border.all(
                                             color: const Color(
-                                              0xFFFFBF00,
+                                              0xFF374151,
                                             ).withValues(alpha: 0.4),
                                           ),
                                         ),
                                         child: Text(
                                           feeder,
                                           style: const TextStyle(
-                                            color: Color(0xFFFFD45C),
+                                            color: Color(0xFFD1D5DB),
                                             fontSize: 11,
                                             fontWeight: FontWeight.w500,
                                           ),
