@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:suga/models/power_interruption.dart';
 import 'package:intl/intl.dart';
+import 'package:suga/widgets/weather_card.dart';
 
 class BrownoutDetailsScreen extends StatelessWidget {
   const BrownoutDetailsScreen({super.key});
@@ -216,7 +217,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
                         child: Text(
                           feeder,
                           style: const TextStyle(
-                            color:Color(0xFFD1D5DB),
+                            color: Color(0xFFD1D5DB),
                             fontSize: 12,
                             fontWeight: FontWeight.w500,
                           ),
@@ -264,6 +265,37 @@ class BrownoutDetailsScreen extends StatelessWidget {
                         : _formatTime(brownout.estimatedRestorationTime!),
                   ),
                 ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // Weather Card
+            const WeatherCard(),
+
+            const SizedBox(height: 16),
+
+            // Notify Before Interruption
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  // TODO: Connect to notification scheduling.
+                },
+                icon: const Icon(Icons.notifications_active_outlined, size: 20),
+                label: const Text('Notify Me Before Interruption'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFBF00),
+                  foregroundColor: const Color(0xFF070A0F),
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ],

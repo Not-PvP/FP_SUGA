@@ -5,22 +5,62 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
 
-class PowerStatusWidget extends StatelessWidget {
+class PowerStatusWidget extends StatefulWidget {
   const PowerStatusWidget({super.key, this.areaId});
 
   final int? areaId;
 
   @override
+  State<PowerStatusWidget> createState() => _PowerStatusWidgetState();
+}
+
+class _PowerStatusWidgetState extends State<PowerStatusWidget>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _glowController;
+  late final Animation<double> _glowScale;
+  late final Animation<double> _glowOpacity;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    );
+
+    _glowScale = Tween<double>(begin: 0.85, end: 1.12).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
+    );
+
+    _glowOpacity = Tween<double>(begin: 0.18, end: 0.42).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Consumer<PowerInterruptionProvider>(
       builder: (context, provider, child) {
-        final displayAreaId = areaId ?? provider.selectedAreaId;
+        final displayAreaId = widget.areaId ?? provider.selectedAreaId;
 
         if (displayAreaId == null) {
           return const SizedBox.shrink();
         }
 
         final hasPower = provider.hasPowerInArea(displayAreaId);
+        if (hasPower && !_glowController.isAnimating) {
+          _glowController.repeat(reverse: true);
+        } else if (!hasPower && _glowController.isAnimating) {
+          _glowController.stop();
+          _glowController.value = 0;
+        }
 
         return Center(
           child: Column(
@@ -38,19 +78,30 @@ class PowerStatusWidget extends StatelessWidget {
                         alignment: Alignment.center,
                         children: [
                           if (hasPower)
-                            ImageFiltered(
-                              imageFilter: ImageFilter.blur(
-                                sigmaX: 65,
-                                sigmaY: 65,
-                              ),
-                              child: Container(
-                                width: 340,
-                                height: 340,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: const Color(
-                                    0xFFFFBF00,
-                                  ).withValues(alpha: 0.35),
+                            AnimatedBuilder(
+                              animation: _glowController,
+                              builder: (context, child) {
+                                return Transform.scale(
+                                  scale: _glowScale.value,
+                                  child: Opacity(
+                                    opacity: _glowOpacity.value,
+                                    child: child,
+                                  ),
+                                );
+                              },
+
+                              child: ImageFiltered(
+                                imageFilter: ImageFilter.blur(
+                                  sigmaX: 65,
+                                  sigmaY: 65,
+                                ),
+                                child: Container(
+                                  width: 340,
+                                  height: 340,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: const Color(0xFFFFBF00),
+                                  ),
                                 ),
                               ),
                             ),

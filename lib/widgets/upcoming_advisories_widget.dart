@@ -120,7 +120,7 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                   ...entry.value.map<Widget>(
                     (advisory) => Container(
                       margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(16),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                       decoration: BoxDecoration(
                         color: const Color(0xFF111720),
                         borderRadius: BorderRadius.circular(18),
@@ -129,7 +129,144 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                           width: 1,
                         ),
                       ),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            advisory.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.access_time,
+                                color: Color(0xFFFFD45C),
+                                size: 15,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  '${DateFormat('h:mm a').format(DateFormat('HH:mm').parse(advisory.startTime))} – ${DateFormat('h:mm a').format(DateFormat('HH:mm').parse(advisory.endTime))}',
+                                  style: const TextStyle(
+                                    color: Color(0xFFFFD45C),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (advisory.feeders.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            const Text(
+                              'AFFECTED FEEDERS',
+                              style: TextStyle(
+                                color: Color(0xFF9CA3AF),
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 1.2,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: advisory.feeders.map<Widget>((feeder) {
+                                return Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF1F2937),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color: const Color(
+                                        0xFF374151,
+                                      ).withValues(alpha: 0.4),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    feeder,
+                                    style: const TextStyle(
+                                      color: Color(0xFFD1D5DB),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                          const SizedBox(height: 16),
+                          const Divider(color: Color(0xFF292F38), height: 1),
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.brownoutDetails,
+                                  arguments: advisory,
+                                );
+                              },
+                              style: TextButton.styleFrom(
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(25),
+                                ),
+                                foregroundColor: const Color(0xFFFFBF00),
+                                overlayColor: Colors.transparent,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 4,
+                                ),
+                                minimumSize: Size.zero,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    'View Details',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  SizedBox(width: 3),
+                                  Icon(Icons.arrow_forward_rounded, size: 16),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else
+              ...upcomingAdvisories.map((advisory) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF111720),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: const Color(0xFF292F38),
+                      width: 1,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
                           Expanded(
                             child: Column(
@@ -154,7 +291,7 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: Text(
-                                        '${DateFormat('h:mm a').format(DateFormat('HH:mm').parse(advisory.startTime))} – ${DateFormat('h:mm a').format(DateFormat('HH:mm').parse(advisory.endTime))}',
+                                        '${DateFormat('MMM d, y').format(DateTime.parse(advisory.date))} · ${DateFormat('h:mm a').format(DateFormat('HH:mm').parse(advisory.startTime))} – ${DateFormat('h:mm a').format(DateFormat('HH:mm').parse(advisory.endTime))}',
                                         style: const TextStyle(
                                           color: Color(0xFFFFD45C),
                                           fontSize: 12,
@@ -163,173 +300,51 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                                     ),
                                   ],
                                 ),
-                                if (advisory.feeders.isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  const Text(
-                                    'AFFECTED FEEDERS',
-                                    style: TextStyle(
-                                      color: Color(0xFF9CA3AF),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 6,
-                                    runSpacing: 6,
-                                    children: advisory.feeders.map<Widget>((
-                                      feeder,
-                                    ) {
-                                      return Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 5,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF1F2937),
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          border: Border.all(
-                                            color: const Color(
-                                              0xFF374151,
-                                            ).withValues(alpha: 0.4),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          feeder,
-                                          style: const TextStyle(
-                                            color: Color(0xFFD1D5DB),
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pushNamed(
-                                context,
-                                AppRoutes.brownoutDetails,
-                                arguments: advisory,
-                              );
-                            },
-                            style: TextButton.styleFrom(
-                              foregroundColor: const Color(0xFFFFBF00),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 10,
-                              ),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'View Details',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                SizedBox(width: 3),
-                                Icon(Icons.arrow_forward_rounded, size: 16),
                               ],
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            ] else
-              ...upcomingAdvisories.map((advisory) {
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 12),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF111720),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: const Color(0xFF292F38),
-                      width: 1,
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              advisory.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
+                      const SizedBox(height: 16),
+                      const Divider(color: Color(0xFF292F38), height: 1),
+                      const SizedBox(height: 6),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: () {
+                            Navigator.pushNamed(
+                              context,
+                              AppRoutes.brownoutDetails,
+                              arguments: advisory,
+                            );
+                          },
+                          style: TextButton.styleFrom(
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(25),
                             ),
-                            const SizedBox(height: 10),
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.access_time,
-                                  color: Color(0xFFFFD45C),
-                                  size: 15,
-                                ),
-                                const SizedBox(width: 6),
-                                Expanded(
-                                  child: Text(
-                                    '${DateFormat('MMM d, y').format(DateTime.parse(advisory.date))} · ${DateFormat('h:mm a').format(DateFormat('HH:mm').parse(advisory.startTime))} – ${DateFormat('h:mm a').format(DateFormat('HH:mm').parse(advisory.endTime))}',
-                                    style: const TextStyle(
-                                      color: Color(0xFFFFD45C),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                              ],
+                            foregroundColor: const Color(0xFFFFBF00),
+                            overlayColor: Colors.transparent,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 4,
                             ),
-                          ],
-                        ),
-                      ),
-
-                      const SizedBox(width: 8),
-
-                      TextButton(
-                        onPressed: () {
-                          Navigator.pushNamed(
-                            context,
-                            AppRoutes.brownoutDetails,
-                            arguments: advisory,
-                          );
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: const Color(0xFFFFBF00),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 4,
-                            vertical: 10,
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              'View Details',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'View Details',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                            SizedBox(width: 3),
-                            Icon(Icons.arrow_forward_rounded, size: 16),
-                          ],
+                              SizedBox(width: 3),
+                              Icon(Icons.arrow_forward_rounded, size: 16),
+                            ],
+                          ),
                         ),
                       ),
                     ],
