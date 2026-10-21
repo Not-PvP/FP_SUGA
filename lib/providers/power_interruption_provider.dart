@@ -9,12 +9,13 @@ import 'package:suga/services/interruption_service.dart';
 // methods with context.read<PowerInterruptionProvider>().
 class PowerInterruptionProvider extends ChangeNotifier {
   PowerInterruptionProvider({InterruptionService? service})
-      : _service = service ?? InterruptionService();
+    : _service = service ?? InterruptionService();
 
   final InterruptionService _service;
 
   List<PowerInterruption> _all = [];
   int? _selectedAreaId;
+  final Set<int> _savedAreaIds = {};
   bool _isLoading = false;
   bool _isSaving = false;
   bool _hasLoaded = false;
@@ -25,7 +26,8 @@ class PowerInterruptionProvider extends ChangeNotifier {
   bool _disposed = false;
 
   // Every interruption, soonest first.
-  UnmodifiableListView<PowerInterruption> get allInterruptions => UnmodifiableListView(_all);
+  UnmodifiableListView<PowerInterruption> get allInterruptions =>
+      UnmodifiableListView(_all);
 
   // The interruptions for the selected area, or all of them when no area is selected.
   List<PowerInterruption> get interruptions {
@@ -34,6 +36,7 @@ class PowerInterruptionProvider extends ChangeNotifier {
   }
 
   int? get selectedAreaId => _selectedAreaId;
+  Set<int> get savedAreaIds => Set.unmodifiable(_savedAreaIds);
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   bool get hasLoaded => _hasLoaded;
@@ -96,8 +99,48 @@ class PowerInterruptionProvider extends ChangeNotifier {
 
   // Shows only one area's interruptions in [interruptions]. Pass null to show all.
   void setAreaFilter(int? areaId) {
+    bool changed = false;
+
+    if (areaId != null) {
+      changed = _savedAreaIds.add(areaId);
+    }
+
+    if (_selectedAreaId != areaId) {
+      _selectedAreaId = areaId;
+      changed = true;
+    }
+
+    if (changed) _notify();
+  }
+
+  void setMainArea(int areaId) {
+    if (!_savedAreaIds.contains(areaId)) return;
+
+    if (_selectedAreaId != areaId) {
+      _selectedAreaId = areaId;
+      _notify();
+    }
+  }
+
+  void removeSavedArea(int areaId) {
+    // Prevent removing the current main area.
     if (_selectedAreaId == areaId) return;
-    _selectedAreaId = areaId;
+
+    if (_savedAreaIds.remove(areaId)) {
+      _notify();
+    }
+  }
+
+  void toggleSavedArea(int areaId) {
+    if (_savedAreaIds.contains(areaId)) {
+      // Keep the main area saved.
+      if (_selectedAreaId == areaId) return;
+
+      _savedAreaIds.remove(areaId);
+    } else {
+      _savedAreaIds.add(areaId);
+    }
+
     _notify();
   }
 
@@ -110,7 +153,8 @@ class PowerInterruptionProvider extends ChangeNotifier {
 
   // Loads every interruption from the API. Calling it again while a load is running
   // waits for that load instead of starting a second request.
-  Future<void> loadInterruptions() => _pendingLoad ??= _load().whenComplete(() => _pendingLoad = null);
+  Future<void> loadInterruptions() =>
+      _pendingLoad ??= _load().whenComplete(() => _pendingLoad = null);
 
   Future<void> _load() async {
     _isLoading = true;
@@ -184,9 +228,9 @@ class PowerInterruptionProvider extends ChangeNotifier {
   // Dates are YYYY-MM-DD and times HH:MM, so comparing the text sorts them correctly.
   static List<PowerInterruption> _sorted(List<PowerInterruption> list) {
     return [...list]..sort((a, b) {
-        final byDate = a.date.compareTo(b.date);
-        return byDate != 0 ? byDate : a.startTime.compareTo(b.startTime);
-      });
+      final byDate = a.date.compareTo(b.date);
+      return byDate != 0 ? byDate : a.startTime.compareTo(b.startTime);
+    });
   }
 
   // A request can finish after the screen that owns the provider is gone.
