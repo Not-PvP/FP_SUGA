@@ -26,10 +26,12 @@ class _MainScreenState extends State<MainScreen> {
         onNavigateToAreas: () => _selectTab(1),
       ),
       AreasScreen(
-        onAreaSelected: () => _selectTab(0)
+        onAreaSelected: () => _selectTab(1)
       ),
       const ScheduledBrownoutsScreen(),
-      const SettingsScreen(),
+      SettingsScreen(
+          onNavigateToAreas: () => _selectTab(1),
+      ),
     ];
   }
 

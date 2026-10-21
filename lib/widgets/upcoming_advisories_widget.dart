@@ -20,6 +20,9 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer<PowerInterruptionProvider>(
       builder: (context, provider, child) {
+        final hasSelectedArea =
+            areaId != null || provider.selectedAreaId != null;
+
         final now = DateTime.now();
 
         final areaAdvisories = areaId != null
@@ -83,7 +86,23 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
             if (showHeader) const SizedBox(height: 14),
 
             // Empty state
-            if (upcomingAdvisories.isEmpty)
+            // Empty state
+            if (!hasSelectedArea && !groupByDate)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111720),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFF292F38)),
+                ),
+                child: const Text(
+                  'Select an area to view upcoming brownouts.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                ),
+              )
+            else if (upcomingAdvisories.isEmpty)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
@@ -204,7 +223,7 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                           ],
                           const SizedBox(height: 16),
                           const Divider(color: Color(0xFF292F38), height: 1),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 10),
                           Align(
                             alignment: Alignment.centerRight,
                             child: TextButton(
@@ -216,14 +235,10 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                                 );
                               },
                               style: TextButton.styleFrom(
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(25),
-                                ),
                                 foregroundColor: const Color(0xFFFFBF00),
-                                overlayColor: Colors.transparent,
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 12,
-                                  vertical: 4,
+                                  vertical: 8,
                                 ),
                                 minimumSize: Size.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -238,8 +253,8 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  SizedBox(width: 3),
-                                  Icon(Icons.arrow_forward_rounded, size: 16),
+                                  SizedBox(width: 4),
+                                  Icon(Icons.arrow_forward, size: 14),
                                 ],
                               ),
                             ),
@@ -250,7 +265,7 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                   ),
                 ],
               ),
-            ] else
+            ] else if (hasSelectedArea)
               ...upcomingAdvisories.map((advisory) {
                 return Container(
                   margin: const EdgeInsets.only(bottom: 12),
@@ -307,7 +322,7 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                       const Divider(color: Color(0xFF292F38), height: 1),
-                      const SizedBox(height: 6),
+                      const SizedBox(height: 10),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
@@ -326,7 +341,7 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                             overlayColor: Colors.transparent,
                             padding: const EdgeInsets.symmetric(
                               horizontal: 12,
-                              vertical: 4,
+                              vertical: 8,
                             ),
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -342,7 +357,7 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
                                 ),
                               ),
                               SizedBox(width: 3),
-                              Icon(Icons.arrow_forward_rounded, size: 16),
+                              Icon(Icons.arrow_forward_rounded, size: 14),
                             ],
                           ),
                         ),

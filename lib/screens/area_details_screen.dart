@@ -33,6 +33,10 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
     Navigator.pop(context);
   }
 
+  void _toggleFavorite(Area area) {
+    context.read<PowerInterruptionProvider>().toggleSavedArea(area.id);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -98,14 +102,19 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
                 return const SizedBox.shrink();
               }
 
+              final provider = context.watch<PowerInterruptionProvider>();
+final isFavorite = provider.savedAreaIds.contains(
+  snapshot.data!.id,
+);
+
               return IconButton(
-                onPressed: () => _setAsMyArea(snapshot.data!),
-                icon: const Icon(
-                  Icons.bookmark_add_outlined,
+                onPressed: () => _toggleFavorite(snapshot.data!),
+                icon: Icon(
+                  isFavorite ? Icons.favorite : Icons.favorite_border,
                   color: Color(0xFFFFBF00),
-                  size: 28,
+                  size: 26,
                 ),
-                tooltip: 'Set as My Area',
+                tooltip: isFavorite ? 'Remove from favorites' : 'Add to favorites',
               );
             },
           ),
