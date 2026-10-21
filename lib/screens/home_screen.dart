@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/models/area.dart';
 import 'package:suga/services/area_service.dart';
-import 'dart:ui';
+import 'package:suga/widgets/power_status_widget.dart';
+import 'package:suga/widgets/weather_card.dart';
+import 'package:suga/widgets/upcoming_advisories_widget.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({
@@ -35,7 +36,7 @@ class HomeScreen extends StatelessWidget {
               // Header
               Row(
                 children: [
-                  // SUGA and greeting on the left
+                  // SUGA and greeting
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -118,7 +119,7 @@ class HomeScreen extends StatelessWidget {
                         color: const Color(0xFF292315),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
-                          color: const Color(0xFFFFBF00).withOpacity(0.5),
+                          color: const Color(0xFFFFBF00).withValues(alpha: 0.5),
                         ),
                       ),
                       child: const Icon(
@@ -243,408 +244,17 @@ class HomeScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              Consumer<PowerInterruptionProvider>(
-                builder: (context, provider, child) {
-                  final areaId = provider.selectedAreaId;
-
-                  // No selected area yet.
-                  if (areaId == null) {
-                    return const SizedBox.shrink();
-                  }
-
-                  final hasPower = provider.hasPowerInArea(areaId);
-
-                  
-                  return Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Lightbulb and glow
-                        SizedBox(
-                          width: double.infinity,
-                          height: 240,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              Transform.translate(
-                                offset: const Offset(0, -20),
-                                child: Stack(
-                                  alignment: Alignment.center,
-                                  children: [
-                                    if (hasPower)
-                                      ImageFiltered(
-                                        imageFilter: ImageFilter.blur(
-                                          sigmaX: 65,
-                                          sigmaY: 65,
-                                        ),
-                                        child: Container(
-                                          width: 340,
-                                          height: 340,
-                                          decoration: BoxDecoration(
-                                            shape: BoxShape.circle,
-                                            color: const Color(0xFFFFBF00)
-                                                .withValues(alpha: 0.35),
-                                          ),
-                                        ),
-                                      ),
-                                    SvgPicture.asset(
-                                      hasPower
-                                          ? 'assets/images/bulb_on.svg'
-                                          : 'assets/images/bulb_off.svg',
-                                      width: 300,
-                                      height: 300,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Status text below the bulb
-                        const SizedBox(height: 0),
-
-                        Text(
-                          hasPower
-                              ? 'No Outage Reported'
-                              : 'Power Outage In Your Area',
-                          textAlign: TextAlign.center,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-
-                        const SizedBox(height: 8),
-
-                        // Time details
-                        if (hasPower)
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.access_time,
-                                color: Colors.white70,
-                                size: 16,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                'As of ${DateTime.now().toLocal().toString().substring(0, 16)}',
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          )
-                        else
-                          Column(
-                            children: [
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  const Icon(
-                                    Icons.access_time,
-                                    color: Colors.white70,
-                                    size: 16,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  const Text(
-                                    'Since [outage start time]',
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 6),
-                              const Text(
-                                'Est. restoration: [estimated time]',
-                                style: TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 13,
-                                ),
-                              ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+              const PowerStatusWidget(),
               
               const SizedBox(height: 24),
 
-              // Weather card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF111720),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: const Color(0xFF292F38),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    // Weather icon
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF292315),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: const Color(0x80FFBF00),
-                        ),
-                      ),
-                      child: const Icon(
-                        Icons.cloud_outlined,
-                        color: Color(0xFFFFBF00),
-                        size: 26,
-                      ),
-                    ),
-
-                    const SizedBox(width: 12),
-
-                    // Weather details
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '28°C · Cloudy',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.water_drop_outlined,
-                                color: Color(0xFF9CA3AF),
-                                size: 14,
-                              ),
-                              SizedBox(width: 4),
-                              Text(
-                                'Rain: 0 mm',
-                                style: TextStyle(
-                                  color: Color(0xFF9CA3AF),
-                                  fontSize: 12,
-                                ),
-                              ),
-                              SizedBox(width: 12),
-                              Icon(
-                                Icons.location_on_outlined,
-                                color: Color(0xFF9CA3AF),
-                                size: 14,
-                              ),
-                              SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  'Iloilo City',
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: Color(0xFF9CA3AF),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              const WeatherCard(),
               
               const SizedBox(height: 28),
 
-              
-              // Upcoming advisories
-              Consumer<PowerInterruptionProvider>(
-                builder: (context, provider, child) {
-                  final now = DateTime.now();
-
-                  // Only show future advisories for the selected area.
-                  final upcomingAdvisories = provider.interruptions.where((
-                    advisory,
-                  ) {
-                    final dateTime = DateTime.tryParse(
-                      '${advisory.date}T${advisory.startTime}',
-                    );
-
-                    final status = advisory.status.toLowerCase();
-
-                    return dateTime != null &&
-                        dateTime.isAfter(now) &&
-                        status != 'cancelled' &&
-                        status != 'completed' &&
-                        status != 'active';
-                  }).toList();
-
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Upcoming header
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.calendar_month_outlined,
-                            color: Color(0xFFFFBF00),
-                            size: 22,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'UPCOMING',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '${upcomingAdvisories.length} advisories',
-                            style: const TextStyle(
-                              color: Color(0xFF9CA3AF),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 14),
-
-                      // Empty state
-                      if (upcomingAdvisories.isEmpty)
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF111720),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: const Color(0xFF292F38),
-                            ),
-                          ),
-                          child: const Text(
-                            'No upcoming advisories for your area.',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: Color(0xFF9CA3AF),
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-
-                      // Advisory cards
-                      ...upcomingAdvisories.map((advisory) {
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF111720),
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                              color: const Color(0xFF292F38),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              // Advisory title and date/time
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      advisory.title,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 15,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Row(
-                                      children: [
-                                        const Icon(
-                                          Icons.access_time,
-                                          color: Color(0xFFFFD45C),
-                                          size: 15,
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            '${advisory.date} · ${advisory.startTime}',
-                                            style: const TextStyle(
-                                              color: Color(0xFFFFD45C),
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-
-                              const SizedBox(width: 8),
-
-                              // View details button
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(
-                                    context,
-                                    '/brownout_details',
-                                    arguments: advisory,
-                                  );
-                                },
-                                style: TextButton.styleFrom(
-                                  foregroundColor: const Color(0xFFFFBF00),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 4,
-                                    vertical: 10,
-                                  ),
-                                ),
-                                child: const Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      'View Details',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    SizedBox(width: 3),
-                                    Icon(
-                                      Icons.arrow_forward_rounded,
-                                      size: 16,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                    ],
-                  );
-                },
-              ),
-
-
+              UpcomingAdvisoriesWidget(
+                areaId: context.watch<PowerInterruptionProvider>().selectedAreaId,
+              )
 
             ],
           ),
