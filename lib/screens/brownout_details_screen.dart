@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:suga/models/power_interruption.dart';
 import 'package:intl/intl.dart';
+import 'package:suga/providers/auth_provider.dart';
+import 'package:suga/providers/power_interruption_provider.dart';
+import 'package:suga/widgets/admin_advisory_actions.dart';
 import 'package:suga/widgets/weather_card.dart';
 
 class BrownoutDetailsScreen extends StatelessWidget {
@@ -8,8 +12,12 @@ class BrownoutDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final brownout =
+    final passed =
         ModalRoute.of(context)?.settings.arguments as PowerInterruption;
+    // Use the provider's copy, so a change made by an admin shows right away.
+    final brownout =
+        context.watch<PowerInterruptionProvider>().findById(passed.id) ?? passed;
+    final isAdmin = context.watch<AuthProvider>().isSignedIn;
     final status = brownout.status.toLowerCase();
     final statusColor = switch (status) {
       'scheduled' => const Color(0xFFFBBF24),
@@ -298,6 +306,12 @@ class BrownoutDetailsScreen extends StatelessWidget {
                 ),
               ),
             ),
+
+            // Only signed-in admins see these.
+            if (isAdmin) ...[
+              const SizedBox(height: 16),
+              AdminAdvisoryActions(advisory: brownout),
+            ],
           ],
         ),
       ),
