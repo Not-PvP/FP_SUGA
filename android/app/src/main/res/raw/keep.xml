@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Release builds strip resources that look unused. The notification icon is only
+     named in Dart code, so keep it, or notifications fail silently in the release APK. -->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/ic_stat_suga" />
