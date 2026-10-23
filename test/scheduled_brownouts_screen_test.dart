@@ -82,7 +82,7 @@ void main() {
                 'title': 'Jaro Power Interruption',
                 'affected_areas': ['Jaro, Iloilo City'],
                 'area_ids': [3],
-                'date': '2026-10-12',
+                'date': '2099-10-12',
                 'start_time': '09:00',
                 'end_time': '14:00',
                 'status': 'scheduled',

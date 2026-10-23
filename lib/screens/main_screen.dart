@@ -1,10 +1,11 @@
-
 import 'package:flutter/material.dart';
 import 'package:suga/screens/home_screen.dart';
 import 'package:suga/screens/areas_screen.dart';
 import 'package:suga/screens/scheduled_brownouts_screen.dart';
 import 'package:suga/screens/settings_screen.dart';
+import 'package:suga/theme/app_theme.dart';
 
+// The four tabs and the bottom navigation bar.
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -13,84 +14,46 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
+  static const _home = 0;
+  static const _areas = 1;
+  static const _scheduled = 2;
 
-  late final List<Widget> _screens;
+  int _selectedIndex = _home;
 
-  @override
-  void initState() {
-    super.initState();
-
-    _screens = [
-      HomeScreen(
-        onNavigateToAreas: () => _selectTab(1),
-      ),
-      AreasScreen(
-        onAreaSelected: () => _selectTab(1)
-      ),
-      const ScheduledBrownoutsScreen(),
-      SettingsScreen(
-          onNavigateToAreas: () => _selectTab(1),
-      ),
-    ];
-  }
+  late final List<Widget> _screens = [
+    HomeScreen(
+      onNavigateToAreas: () => _selectTab(_areas),
+      onNavigateToScheduled: () => _selectTab(_scheduled),
+    ),
+    // After "Set as home area", go back to Home to show that area's status.
+    AreasScreen(onAreaSelected: () => _selectTab(_home)),
+    const ScheduledBrownoutsScreen(),
+    SettingsScreen(onNavigateToAreas: () => _selectTab(_areas)),
+  ];
 
   void _selectTab(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    setState(() => _selectedIndex = index);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF070A0F),
-
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
-
-      bottomNavigationBar: Container(
+      body: IndexedStack(index: _selectedIndex, children: _screens),
+      bottomNavigationBar: DecoratedBox(
         decoration: const BoxDecoration(
-          color: Color(0xFF111720),
-          border: Border(
-            top: BorderSide(
-              color: Color(0xFF292F38),
-              width: 1,
-            ),
-          ),
+          color: AppColors.surface,
+          border: Border(top: BorderSide(color: AppColors.line)),
         ),
         child: SafeArea(
           top: false,
-          child: SizedBox(
-            height: 68,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 64),
             child: Row(
               children: [
-                _buildNavItem(
-                  index: 0,
-                  label: 'Home',
-                  icon: Icons.home_outlined,
-                  activeIcon: Icons.home_rounded,
-                ),
-                _buildNavItem(
-                  index: 1,
-                  label: 'Areas',
-                  icon: Icons.map_outlined,
-                  activeIcon: Icons.map_rounded,
-                ),
-                _buildNavItem(
-                  index: 2,
-                  label: 'Scheduled',
-                  icon: Icons.calendar_month_outlined,
-                  activeIcon: Icons.calendar_month_rounded,
-                ),
-                _buildNavItem(
-                  index: 3,
-                  label: 'Settings',
-                  icon: Icons.settings_outlined,
-                  activeIcon: Icons.settings_rounded,
-                ),
+                _buildNavItem(0, 'Home', Icons.home_outlined, Icons.home_rounded),
+                _buildNavItem(1, 'Areas', Icons.map_outlined, Icons.map_rounded),
+                _buildNavItem(2, 'Scheduled', Icons.calendar_month_outlined, Icons.calendar_month_rounded),
+                _buildNavItem(3, 'Settings', Icons.settings_outlined, Icons.settings_rounded),
               ],
             ),
           ),
@@ -99,41 +62,36 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  Widget _buildNavItem({
-    required int index,
-    required String label,
-    required IconData icon,
-    required IconData activeIcon,
-  }) {
+  Widget _buildNavItem(int index, String label, IconData icon, IconData activeIcon) {
     final isSelected = _selectedIndex == index;
-
-    const activeColor = Color(0xFFFFBF00);
-    const inactiveColor = Color(0xFF9CA3AF);
+    final color = isSelected ? AppColors.amber : AppColors.textMuted;
 
     return Expanded(
-      child: Material(
-        color: Colors.transparent,
+      child: Semantics(
+        selected: isSelected,
+        button: true,
+        label: '$label tab',
+        excludeSemantics: true,
         child: InkWell(
           onTap: () => _selectTab(index),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isSelected ? activeIcon : icon,
-                size: 24,
-                color: isSelected ? activeColor : inactiveColor,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected ? activeColor : inactiveColor,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(isSelected ? activeIcon : icon, size: 24, color: color),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontFamily: AppText.font,
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: color,
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

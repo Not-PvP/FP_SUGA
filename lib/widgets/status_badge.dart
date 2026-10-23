@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:suga/theme/app_theme.dart';
 
 // Coloured pill for an advisory status: scheduled, ongoing, restored or cancelled.
 class StatusBadge extends StatelessWidget {
@@ -6,12 +7,13 @@ class StatusBadge extends StatelessWidget {
 
   final String status;
 
+  // Amber is kept for the brand and buttons, so "scheduled" gets its own colour.
   static Color colorFor(String status) => switch (status.toLowerCase()) {
-        'scheduled' => const Color(0xFFFBBF24),
-        'ongoing' => const Color(0xFFF97316),
-        'restored' => const Color(0xFF34D399),
-        'cancelled' || 'canceled' => const Color(0xFFF87171),
-        _ => const Color(0xFF64748B),
+        'scheduled' => AppColors.planned,
+        'ongoing' => AppColors.outage,
+        'restored' => AppColors.powerOn,
+        'cancelled' || 'canceled' => AppColors.textMuted,
+        _ => AppColors.textMuted,
       };
 
   static String labelFor(String status) {
@@ -26,12 +28,17 @@ class StatusBadge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.35)),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
         labelFor(status),
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          fontFamily: AppText.font,
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }

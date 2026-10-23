@@ -1,350 +1,212 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:suga/models/power_interruption.dart';
-import 'package:intl/intl.dart';
 import 'package:suga/providers/auth_provider.dart';
 import 'package:suga/providers/notification_provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
+import 'package:suga/theme/app_theme.dart';
 import 'package:suga/utils/advisory_time.dart';
+import 'package:suga/utils/format.dart';
 import 'package:suga/widgets/admin_advisory_actions.dart';
-import 'package:suga/widgets/weather_card.dart';
+import 'package:suga/widgets/day_strip.dart';
+import 'package:suga/widgets/status_badge.dart';
+import 'package:suga/widgets/ui.dart';
 
 class BrownoutDetailsScreen extends StatelessWidget {
   const BrownoutDetailsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final passed =
-        ModalRoute.of(context)?.settings.arguments as PowerInterruption;
+    final passed = ModalRoute.of(context)?.settings.arguments as PowerInterruption;
     // Use the provider's copy, so a change made by an admin shows right away.
-    final brownout =
-        context.watch<PowerInterruptionProvider>().findById(passed.id) ?? passed;
+    final brownout = context.watch<PowerInterruptionProvider>().findById(passed.id) ?? passed;
     final isAdmin = context.watch<AuthProvider>().isSignedIn;
     final notifications = context.watch<NotificationProvider>();
-    final hasReminder = notifications.hasReminder(brownout);
-    // Reminders are only for brownouts that are still coming up.
-    final start = advisoryStart(brownout);
-    final canRemind = brownout.status.toLowerCase() == 'scheduled' &&
-        start != null &&
-        start.isAfter(DateTime.now());
+
+    final now = DateTime.now();
     final status = brownout.status.toLowerCase();
-    final statusColor = switch (status) {
-      'scheduled' => const Color(0xFFFBBF24),
-      'restored' => const Color(0xFF34D399),
-      'cancelled' || 'canceled' => const Color(0xFFF87171),
-      _ => const Color(0xFF64748B),
-    };
+    final start = advisoryStart(brownout);
+    // Reminders are only for brownouts that are still coming up.
+    final canRemind = status == 'scheduled' && start != null && start.isAfter(now);
+    final hasReminder = notifications.hasReminder(brownout);
+    final lead = NotificationProvider.leadTimeLabel(notifications.leadMinutes);
 
-    Widget _buildInfoSection(String label, String value) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF9CA3AF),
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            value.trim().isEmpty ? 'Not specified' : value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
-        ],
-      );
-    }
-
-    String _formatDuration(String start, String end) {
-      try {
-        final startParts = start.split(':').map(int.parse).toList();
-        final endParts = end.split(':').map(int.parse).toList();
-
-        final startMinutes = startParts[0] * 60 + startParts[1];
-        var endMinutes = endParts[0] * 60 + endParts[1];
-
-        if (endMinutes < startMinutes) {
-          endMinutes += 24 * 60;
-        }
-
-        final totalMinutes = endMinutes - startMinutes;
-        final hours = totalMinutes ~/ 60;
-        final minutes = totalMinutes % 60;
-
-        if (hours == 0) {
-          return '$minutes ${minutes == 1 ? 'minute' : 'minutes'}';
-        }
-
-        if (minutes == 0) {
-          return '$hours ${hours == 1 ? 'hour' : 'hours'}';
-        }
-
-        return '$hours ${hours == 1 ? 'hour' : 'hours'} '
-            '$minutes ${minutes == 1 ? 'minute' : 'minutes'}';
-      } catch (_) {
-        return 'Not specified';
-      }
-    }
-
-    String _formatTime(String time) {
-      try {
-        final parsed = DateFormat('HH:mm').parseStrict(time);
-        return DateFormat('h:mm a').format(parsed);
-      } catch (_) {
-        return time;
-      }
-    }
+    final day = DateTime.tryParse(brownout.date);
+    final startMinutes = minutesOf(brownout.startTime);
+    final endMinutes = minutesOf(brownout.endTime);
+    final length = durationMinutes(brownout);
+    final accent = status == 'ongoing' ? AppColors.outage : AppColors.amber;
+    final restoration = brownout.estimatedRestorationTime?.trim() ?? '';
 
     return Scaffold(
-      backgroundColor: const Color(0xFF070A0F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF070A0F),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: const Text(
-          'Brownout Details',
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
+      appBar: AppBar(title: const Text('Brownout details')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        children: [
+          Row(
+            children: [
+              StatusBadge(status: brownout.status),
+              if (canRemind) ...[
+                const SizedBox(width: 10),
+                Text(
+                  'Starts ${lowerFirst(timeUntil(start, now))}',
+                  style: AppText.small.copyWith(color: AppColors.amber, fontWeight: FontWeight.w600),
+                ),
+              ],
+            ],
           ),
-        ),
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+          const SizedBox(height: 12),
+          Semantics(
+            header: true,
+            child: Text(
+              brownout.title.isEmpty ? 'Power interruption' : brownout.title,
+              style: AppText.screenTitle,
+            ),
+          ),
+          if (brownout.affectedAreas.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(brownout.affectedAreas.join(' · '), style: AppText.body),
+          ],
+          const SizedBox(height: 20),
+
+          // When
+          SugaCard(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        brownout.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          height: 1.2,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        DateFormat(
-                          'MMMM, d, yyyy',
-                        ).format(DateTime.parse(brownout.date)),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFFFFBF00),
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
+                Text(day != null ? formatLongDate(day) : brownout.date, style: AppText.label),
+                const SizedBox(height: 6),
+                Text(
+                  formatTimeRange(brownout),
+                  style: AppText.headline.copyWith(fontSize: 22, color: accent),
                 ),
-                const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
+                if (length != null) ...[
+                  const SizedBox(height: 4),
+                  Text('${formatDuration(length)} without power', style: AppText.muted),
+                ],
+                if (startMinutes != null && endMinutes != null) ...[
+                  const SizedBox(height: 16),
+                  DayStrip(
+                    startMinutes: startMinutes,
+                    endMinutes: endMinutes,
+                    color: accent,
+                    nowMinutes: day != null && DateUtils.isSameDay(day, now)
+                        ? now.hour * 60 + now.minute
+                        : null,
                   ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.35),
-                    ),
-                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
 
-                  child: Text(
-                    brownout.status[0].toUpperCase() +
-                        brownout.status.substring(1).toLowerCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
+          // What and why
+          SugaCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Affected feeders', style: AppText.label),
+                const SizedBox(height: 8),
+                if (brownout.feeders.isEmpty)
+                  const Text('Whole area', style: AppText.body)
+                else
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [for (final feeder in brownout.feeders) FeederChip(feeder)],
                   ),
+                const _Gap(),
+                _Info('Reason', brownout.reason),
+                const _Gap(),
+                _Info('Details', brownout.description),
+                const _Gap(),
+                _Info(
+                  'Expected restoration',
+                  restoration.isEmpty ? '' : formatClock(restoration),
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 20),
 
-            const SizedBox(height: 24),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF111720),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFF292F38), width: 1),
-              ),
-
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          // Reminder
+          if (!canRemind)
+            const Text(
+              'Reminders are only available before a scheduled brownout starts.',
+              textAlign: TextAlign.center,
+              style: AppText.small,
+            )
+          else if (hasReminder)
+            SugaCard(
+              color: AppColors.amberSoft,
+              borderColor: AppColors.amber.withValues(alpha: 0.35),
+              child: Row(
                 children: [
-                  // Areas
-                  _buildInfoSection('Areas', brownout.affectedAreas.join(', ')),
-                  const SizedBox(height: 20),
-
-                  // Feeders
-                  const Text(
-                    'Affected Feeders',
-                    style: TextStyle(
-                      color: Color(0xFF9CA3AF),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                  const Icon(Icons.notifications_active_rounded, color: AppColors.amber),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      "Reminder set. We'll notify you $lead before it starts.",
+                      style: AppText.body.copyWith(color: AppColors.text),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: brownout.feeders.map((feeder) {
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 7,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF1F2937),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: const Color(
-                              0xFF374151,
-                            ).withValues(alpha: 0.4),
-                          ),
-                        ),
-                        child: Text(
-                          feeder,
-                          style: const TextStyle(
-                            color: Color(0xFFD1D5DB),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Time and Duration
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: _buildInfoSection(
-                          'Time',
-                          '${_formatTime(brownout.startTime)} – ${_formatTime(brownout.endTime)}',
-                        ),
-                      ),
-                      const SizedBox(width: 20),
-                      Expanded(
-                        child: _buildInfoSection(
-                          'Duration',
-                          _formatDuration(brownout.startTime, brownout.endTime),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Reason
-                  _buildInfoSection('Reason', brownout.reason),
-                  const SizedBox(height: 20),
-
-                  // Advisory Details
-                  _buildInfoSection('Advisory Details', brownout.description),
-                  const SizedBox(height: 20),
-
-                  // Estimated Restoration
-                  _buildInfoSection(
-                    'Estimated Restoration',
-                    brownout.estimatedRestorationTime == null ||
-                            brownout.estimatedRestorationTime!.trim().isEmpty
-                        ? 'Not specified'
-                        : _formatTime(brownout.estimatedRestorationTime!),
                   ),
                 ],
               ),
-            ),
-            const SizedBox(height: 20),
-
-            // Weather Card
-            const WeatherCard(),
-
-            const SizedBox(height: 16),
-
-            // Notify Before Interruption: schedules a phone reminder for this advisory.
+            )
+          else
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: !canRemind
-                    ? null
-                    : () async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        final willFire = await notifications.remindMe(brownout);
-                        messenger.showSnackBar(SnackBar(
-                          content: Text(willFire
-                              ? "We'll remind you ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} before it starts."
-                              : 'Saved to your alerts. Allow notifications to get a phone reminder.'),
-                        ));
-                      },
-                icon: Icon(
-                  hasReminder
-                      ? Icons.notifications_active_rounded
-                      : Icons.notifications_active_outlined,
-                  size: 20,
-                ),
-                label: Text(
-                  !canRemind
-                      ? 'No Reminder for This Advisory'
-                      : hasReminder
-                          ? 'Reminder Set · ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} Before'
-                          : 'Notify Me Before Interruption',
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFBF00),
-                  foregroundColor: const Color(0xFF070A0F),
-                  disabledBackgroundColor: const Color(0xFF1F2937),
-                  disabledForegroundColor: const Color(0xFF9CA3AF),
-                  elevation: 0,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  textStyle: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  final willFire = await notifications.remindMe(brownout);
+                  messenger.showSnackBar(SnackBar(
+                    content: Text(willFire
+                        ? "Reminder set for $lead before it starts"
+                        : 'Saved to your alerts. Allow notifications to get a phone reminder.'),
+                  ));
+                },
+                icon: const Icon(Icons.notifications_active_outlined, size: 20),
+                label: Text('Remind me $lead before'),
               ),
             ),
 
-            // Only signed-in admins see these.
-            if (isAdmin) ...[
-              const SizedBox(height: 16),
-              AdminAdvisoryActions(advisory: brownout),
-            ],
+          // Only signed-in admins see these.
+          if (isAdmin) ...[
+            const SizedBox(height: 16),
+            AdminAdvisoryActions(advisory: brownout),
           ],
-        ),
+        ],
       ),
+    );
+  }
+}
+
+class _Gap extends StatelessWidget {
+  const _Gap();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Divider(),
+      );
+}
+
+class _Info extends StatelessWidget {
+  const _Info(this.label, this.value);
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppText.label),
+        const SizedBox(height: 6),
+        Text(value.trim().isEmpty ? 'Not specified' : value, style: AppText.body),
+      ],
     );
   }
 }
