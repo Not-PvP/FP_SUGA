@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:suga/screens/home_screen.dart';
+
 import 'package:suga/screens/settings_screen.dart';
 
 import 'package:suga/screens/areas_screen.dart';
@@ -7,7 +7,7 @@ import 'package:suga/screens/area_details_screen.dart';
 import 'package:suga/screens/scheduled_brownouts_screen.dart';
 import 'package:suga/screens/brownout_details_screen.dart';
 import 'package:suga/screens/notifications_screen.dart';
-
+import 'package:suga/screens/main_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -20,7 +20,7 @@ class AppRoutes {
   static const String notifications = '/notifications';
 
   static Map<String, WidgetBuilder> get routes => {
-    home: (_) => const HomeScreen(),
+    home: (_) => const MainScreen(),
     settings: (_) => const SettingsScreen(),
     areas: (_) => const AreasScreen(),
     areaDetails: (_) => const AreaDetailsScreen(),

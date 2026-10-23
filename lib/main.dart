@@ -18,9 +18,11 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PowerInterruptionProvider()),
       ],
       child: MaterialApp(
+        debugShowCheckedModeBanner: false,
         title: 'SUGA',
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          fontFamily: 'PlusJakartaSans',
         ),
         routes: AppRoutes.routes,
       ),
