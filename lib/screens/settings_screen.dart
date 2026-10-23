@@ -4,7 +4,8 @@ import 'package:suga/services/area_service.dart';
 import 'package:provider/provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:suga/screens/admin_login_screen.dart';
+import 'package:suga/providers/auth_provider.dart';
+import 'package:suga/routes/app_routes.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.onNavigateToAreas});
@@ -194,110 +195,151 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildAdminSection() {
     const amber = Color(0xFFFFBF00);
+    const danger = Color(0xFFF87171);
     const cardColor = Color(0xFF111720);
     const borderColor = Color(0xFF292F38);
     const secondaryText = Color(0xFF9CA3AF);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(0, 12, 0, 12),
-          child: Text(
-            'ADMIN',
-            style: TextStyle(
-              color: secondaryText,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.5,
+    // Rebuilds when the admin signs in or out, or the session expires.
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        final admin = auth.admin;
+        final signedIn = admin != null;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(0, 12, 0, 12),
+              child: Text(
+                'ADMIN',
+                style: TextStyle(
+                  color: secondaryText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
+                ),
+              ),
             ),
-          ),
-        ),
-        Container(
-          margin: const EdgeInsets.only(bottom: 24),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+            Container(
+              margin: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: signedIn ? amber.withValues(alpha: 0.5) : borderColor,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF292315),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.admin_panel_settings_outlined,
-                      color: amber,
-                      size: 26,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF292315),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          signedIn
+                              ? Icons.verified_user_outlined
+                              : Icons.admin_panel_settings_outlined,
+                          color: amber,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              signedIn ? 'Signed in as admin' : 'Admin Login',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              signedIn
+                                  ? admin.email
+                                  : 'Manage advisories and feeder information',
+                              style: const TextStyle(
+                                color: secondaryText,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Admin Login',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Manage advisories and feeder information',
-                          style: TextStyle(
-                            color: Color(0xFF9CA3AF),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                  if (signedIn) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Admin tools are shown on Scheduled Brownouts and on each advisory.',
+                      style: TextStyle(color: Color(0xFFD1D5DB), fontSize: 12),
                     ),
+                  ],
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: signedIn
+                        ? OutlinedButton.icon(
+                            onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              await context.read<AuthProvider>().logout();
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Signed out. Admin tools are hidden.'),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.logout_rounded, size: 18),
+                            label: const Text('Sign Out'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: danger,
+                              side: BorderSide(color: danger.withValues(alpha: 0.5)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: () =>
+                                Navigator.pushNamed(context, AppRoutes.adminLogin),
+                            icon: const Icon(Icons.login_rounded, size: 18),
+                            label: const Text('Open Admin Portal'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: amber,
+                              foregroundColor: const Color(0xFF070A0F),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AdminLoginScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.login_rounded, size: 18),
-                  label: const Text('Open Admin Portal'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: amber,
-                    foregroundColor: const Color(0xFF070A0F),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 
