@@ -1,9 +1,12 @@
-// Starts the API on a random port and checks the area and interruption endpoints
-// against the real database. Uses a temporary test area and test interruption,
+// Starts the API on a random port and checks the auth, area and interruption endpoints
+// against the real database. Uses a temporary test admin, test area and test interruption,
 // which are deleted at the end.
 import assert from 'node:assert/strict';
 process.env.ADMIN_API_KEY = 'test-key';
 const { createApp } = await import('./app.js');
+const { hashPassword } = await import('./auth/password.js');
+const { hashToken } = await import('./auth/tokens.js');
+const admins = await import('./repositories/adminRepository.js');
 
 const server = createApp().listen(0);
 const root = `http://localhost:${server.address().port}/api`;
@@ -31,10 +34,94 @@ function assertInvalid(r, fields) {
 
 let areaId;
 let interruptionId;
+let adminId;
 
 try {
+  // ---------- Admin sign-in ----------
+  const adminLogin = { email: 'api-check-admin@suga.test', password: 'correct horse battery' };
+  ({ admin: { id: adminId } } = await admins.saveAdmin({
+    email: adminLogin.email,
+    name: 'Api Check Admin',
+    passwordHash: await hashPassword(adminLogin.password),
+  }));
+  const login = (body) => request('/auth/login', { method: 'POST', headers: json, body });
+  const bearer = (token) => ({ ...json, authorization: `Bearer ${token}` });
+
+  let r = await login({ email: adminLogin.email, password: 'wrong password' });
+  assert.equal(r.status, 401);
+  assert.equal(r.body.error.code, 'INVALID_CREDENTIALS');
+  const wrongPasswordMessage = r.body.error.message;
+  r = await login({ email: 'nobody@suga.test', password: 'whatever' });
+  assert.equal(r.status, 401);
+  assert.equal(r.body.error.message, wrongPasswordMessage);
+  pass('wrong password and unknown email -> the same 401 INVALID_CREDENTIALS');
+
+  r = await login({ email: 'not-an-email', password: '', remember: true });
+  assertInvalid(r, ['email', 'password', 'remember']);
+  pass('login validation -> 400');
+
+  r = await login({ email: ` ${adminLogin.email.toUpperCase()} `, password: adminLogin.password });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.data.token_type, 'Bearer');
+  assert.equal(r.body.data.admin.email, adminLogin.email);
+  assert.equal(r.body.data.admin.password_hash, undefined);
+  assert.ok(Date.parse(r.body.data.expires_at) > Date.now());
+  const token = r.body.data.token;
+  pass('login (email ignores case and spaces) -> token, expiry, admin without the hash');
+
+  r = await request('/auth/me', { headers: bearer(token) });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.data.admin.id, adminId);
+  r = await request('/auth/me');
+  assert.equal(r.status, 401);
+  assert.equal(r.body.error.code, 'UNAUTHORIZED');
+  r = await request('/auth/me', { headers: { authorization: `Token ${token}` } });
+  assert.equal(r.body.error.code, 'INVALID_TOKEN');
+  r = await request('/auth/me', { headers: { 'x-api-key': 'test-key' } });
+  assert.equal(r.status, 401);
+  pass('GET /auth/me needs a valid Bearer token (the API key is not a session)');
+
+  const advisory = { title: 'Auth Check', date: '2026-11-04', start_time: '08:00', end_time: '09:00', area_ids: [1] };
+  r = await request('/interruptions', { method: 'POST', headers: bearer('made-up-token'), body: advisory });
+  assert.equal(r.status, 401);
+  assert.equal(r.body.error.code, 'INVALID_TOKEN');
+  r = await request('/interruptions', { method: 'POST', headers: bearer(token), body: advisory });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  r = await request(`/interruptions/${r.body.data.id}`, { method: 'DELETE', headers: bearer(token) });
+  assert.equal(r.status, 204);
+  pass('admin routes accept a signed-in token and reject a made-up one');
+
+  const expiredToken = 'expired-session-token';
+  await admins.createSession({
+    adminId,
+    tokenHash: hashToken(expiredToken),
+    expiresAt: new Date(Date.now() - 1000).toISOString(),
+  });
+  r = await request('/interruptions', { method: 'POST', headers: bearer(expiredToken), body: advisory });
+  assert.equal(r.status, 401);
+  assert.equal(r.body.error.code, 'SESSION_EXPIRED');
+  r = await request('/auth/me', { headers: bearer(expiredToken) });
+  assert.equal(r.body.error.code, 'INVALID_TOKEN');
+  pass('expired session -> 401 SESSION_EXPIRED, then removed');
+
+  r = await request('/auth/logout', { method: 'POST', headers: bearer(token) });
+  assert.equal(r.status, 204);
+  r = await request('/auth/me', { headers: bearer(token) });
+  assert.equal(r.status, 401);
+  assert.equal(r.body.error.code, 'INVALID_TOKEN');
+  r = await request('/interruptions', { method: 'POST', headers: bearer(token), body: advisory });
+  assert.equal(r.status, 401);
+  pass('logout -> 204, and the token stops working at once');
+
+  const guess = { email: 'rate-limit@suga.test', password: 'guess' };
+  for (let i = 0; i < 5; i += 1) assert.equal((await login(guess)).status, 401);
+  r = await login(guess);
+  assert.equal(r.status, 429);
+  assert.equal(r.body.error.code, 'TOO_MANY_ATTEMPTS');
+  pass('5 failed logins for one email -> 429 TOO_MANY_ATTEMPTS');
+
   // ---------- Areas ----------
-  let r = await request('/areas');
+  r = await request('/areas');
   assert.equal(r.status, 200);
   assert.equal(r.body.success, true);
   assert.equal(r.body.count, r.body.data.length);
@@ -128,6 +215,7 @@ try {
   });
   assert.equal(res.status, 204);
   assert.match(res.headers.get('access-control-allow-headers'), /x-api-key/);
+  assert.match(res.headers.get('access-control-allow-headers'), /Authorization/);
   pass('CORS headers and preflight for the Flutter web build');
 
   // ---------- Interruptions: reads ----------
@@ -279,6 +367,10 @@ try {
     assert.equal(r.status, 204);
     assert.equal((await request(`/areas/${areaId}`)).status, 404);
     pass('delete area -> 204, then 404');
+  }
+  if (adminId) {
+    assert.ok(await admins.deleteAdmin(adminId));
+    pass('delete test admin and its sessions');
   }
   server.close();
   process.exit(process.exitCode ?? 0);
