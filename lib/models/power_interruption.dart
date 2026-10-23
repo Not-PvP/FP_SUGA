@@ -15,6 +15,10 @@ class PowerInterruption {
   final List<String> feeders;
   final List<int> feederIds;
 
+  // When the advisory was posted and last changed (UTC). Used for notifications.
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
   PowerInterruption({
     required this.id,
     required this.title,
@@ -29,6 +33,8 @@ class PowerInterruption {
     this.areaIds = const [],
     this.feeders = const [],
     this.feederIds = const [],
+    this.createdAt,
+    this.updatedAt,
   });
 
   // Accepts the backend's snake_case keys as well as the camelCase keys from toJson().
@@ -48,7 +54,17 @@ class PowerInterruption {
       areaIds: _ints(json['area_ids'] ?? json['areaIds']),
       feeders: _strings(json['feeders']),
       feederIds: _ints(json['feeder_ids'] ?? json['feederIds']),
+      createdAt: _timestamp(json['created_at'] ?? json['createdAt']),
+      updatedAt: _timestamp(json['updated_at'] ?? json['updatedAt']),
     );
+  }
+
+  // The API sends SQLite timestamps in UTC, like "2026-10-09 13:41:03".
+  static DateTime? _timestamp(dynamic value) {
+    if (value is! String || value.isEmpty) return null;
+    final text = value.replaceFirst(' ', 'T');
+    final hasZone = text.endsWith('Z') || RegExp(r'[+-]\d\d:\d\d$').hasMatch(text);
+    return DateTime.tryParse(hasZone ? text : '${text}Z');
   }
 
   static List<String> _strings(dynamic value) =>
@@ -71,6 +87,8 @@ class PowerInterruption {
     List<int>? areaIds,
     List<String>? feeders,
     List<int>? feederIds,
+    DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return PowerInterruption(
       id: id ?? this.id,
@@ -86,6 +104,8 @@ class PowerInterruption {
       areaIds: areaIds ?? this.areaIds,
       feeders: feeders ?? this.feeders,
       feederIds: feederIds ?? this.feederIds,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 
@@ -104,6 +124,8 @@ class PowerInterruption {
       'areaIds': areaIds,
       'feeders': feeders,
       'feederIds': feederIds,
+      'createdAt': createdAt?.toIso8601String(),
+      'updatedAt': updatedAt?.toIso8601String(),
     };
   }
 

@@ -14,7 +14,10 @@ cp .env.example .env        # Windows: copy .env.example .env
 npm run db:migrate          # create the tables
 npm run db:seed             # add areas, feeders and sample advisories
 npm run db:verify           # check create, read, update and delete
+npm run admin:create -- --email admin@suga.ph --password "a long password" --name "SUGA Admin"
 ```
+
+The last command creates the admin account used to sign in to the app's Admin Portal.
 
 ## Environment variables
 
@@ -23,7 +26,9 @@ npm run db:verify           # check create, read, update and delete
 | `DATABASE_URL` | `file:./data/suga.db` for local development, or `libsql://<name>.turso.io` for Turso |
 | `DATABASE_AUTH_TOKEN` | Turso auth token. Leave empty for a local file. |
 | `PORT` | API port. Defaults to 3000. |
-| `ADMIN_API_KEY` | Secret for admin routes, sent as the `x-api-key` header. If unset, admin routes return 503. |
+| `ADMIN_SESSION_HOURS` | How long an admin stays signed in. Defaults to 12. |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME` | Optional. Read only by `npm run admin:create` when no `--email`/`--password`/`--name` is given. |
+| `ADMIN_API_KEY` | Optional. Lets server scripts call admin routes with the `x-api-key` header instead of signing in. Leave empty to turn this off; a request that sends `x-api-key` then gets 503. |
 | `CORS_ORIGIN` | Origins allowed to call the API from a browser (the Flutter web build), comma separated. Unset or `*` allows any origin. |
 
 `.env` is ignored by git, so the token never reaches the public repository.
@@ -35,8 +40,9 @@ npm run db:verify           # check create, read, update and delete
 | `npm run db:migrate` | Creates any missing tables. Safe to run again. |
 | `npm run db:seed` | Adds starting data. Safe to run again; existing rows are skipped. |
 | `npm run db:reset` | Drops every table, recreates them and reseeds. **Deletes all data.** |
+| `npm run admin:create` | Creates an admin account, or resets its password (which signs it out on every device). Passwords need at least 8 characters. |
 | `npm start` | Starts the API (`npm run dev` restarts on file changes). |
-| `npm run test:api` | Checks the area and interruption endpoints, including validation and error responses, against the real database. Uses a temporary test area and interruption. |
+| `npm run test:api` | Checks the auth, area and interruption endpoints, including validation and error responses, against the real database. Uses a temporary test admin, area and interruption. |
 | `npm run db:verify` | Runs create, read, update and delete checks using temporary test rows. |
 
 ## API responses
@@ -72,17 +78,54 @@ Every response is JSON with the same shape, so the app can check `success` first
 | 400 | `INVALID_ID` | An id in the path or in `?area_id=` is not a positive integer. |
 | 400 | `INVALID_QUERY` | A query parameter is unknown (e.g. `?areaId=` instead of `?area_id=`) or was sent more than once. `details` names the parameter. |
 | 400 | `INVALID_REFERENCE`, `INVALID_DATA` | The database rejected a write that got past validation. Nothing was saved. |
-| 401 | `UNAUTHORIZED` | The `x-api-key` header is missing or wrong on an admin route. |
+| 401 | `INVALID_CREDENTIALS` | Login with a wrong email or password. The message is the same for both. |
+| 401 | `UNAUTHORIZED` | An admin route was called without signing in (no `Authorization` header), or with a wrong `x-api-key`. |
+| 401 | `INVALID_TOKEN` | The Bearer token is unknown, malformed or was signed out. Sign in again. |
+| 401 | `SESSION_EXPIRED` | The Bearer token was valid but has expired. Sign in again. |
 | 404 | `NOT_FOUND`, `AREA_NOT_FOUND`, `INTERRUPTION_NOT_FOUND` | The route or record does not exist. |
 | 409 | `DUPLICATE_AREA`, `CONFLICT` | An area with the same name already exists in that city (ignoring case). |
 | 413 | `PAYLOAD_TOO_LARGE` | The body is over 100 KB. |
 | 415 | `UNSUPPORTED_MEDIA_TYPE` | A body was sent without `Content-Type: application/json`. |
+| 429 | `TOO_MANY_ATTEMPTS` | 5 failed logins for one email from one address within 15 minutes. The `Retry-After` header gives the seconds to wait. |
 | 500 | `INTERNAL_ERROR` | Unexpected server error. Details are logged on the server, not sent to the app. |
-| 503 | `ADMIN_DISABLED` | `ADMIN_API_KEY` is not set on the server. |
+| 503 | `ADMIN_DISABLED` | `x-api-key` was sent but `ADMIN_API_KEY` is not set on the server. |
 
-Admin routes need the header `x-api-key: <ADMIN_API_KEY>`. Requests with a body need `Content-Type: application/json`.
+Admin routes need the header `Authorization: Bearer <token>` from [`POST /api/auth/login`](#auth-api) (or `x-api-key: <ADMIN_API_KEY>` for server scripts). Requests with a body need `Content-Type: application/json`.
 
 List routes only accept the query parameters listed below. Anything else returns `400 INVALID_QUERY`, so a typo never silently returns the unfiltered list.
+
+## Auth API
+
+Admins sign in with an email and password and get a token. The app sends it as
+`Authorization: Bearer <token>` on every admin request.
+
+| Method | Path | Auth | Description |
+| --- | --- | --- | --- |
+| POST | `/api/auth/login` | none | Body `{ "email", "password" }`. Returns the token, when it expires, and the admin. |
+| GET | `/api/auth/me` | token | Checks that a saved token still works. Returns the admin and `expires_at`. |
+| POST | `/api/auth/logout` | token | Ends this session. The token stops working at once. Returns 204. |
+
+```jsonc
+// POST /api/auth/login -> 200
+{
+  "success": true,
+  "data": {
+    "token": "q3J0...",
+    "token_type": "Bearer",
+    "expires_at": "2026-10-23T17:55:55.445Z",
+    "admin": { "id": 1, "email": "admin@suga.ph", "name": "SUGA Admin" }
+  }
+}
+```
+
+How it is kept safe:
+
+- Passwords are stored as salted scrypt hashes (`src/auth/password.js`), never as text.
+- The token is 32 random bytes. The database keeps only its SHA-256 hash, so a copy of the database cannot be used to sign in.
+- Sessions expire after `ADMIN_SESSION_HOURS` (12 by default). An expired token gets `SESSION_EXPIRED`, so the app can ask the admin to sign in again.
+- A wrong email and a wrong password get the same message and take about the same time, so the API does not reveal which emails are admins.
+- After 5 failed logins for one email from one address, that pair is blocked for 15 minutes (`src/middleware/loginLimiter.js`). The count is kept in memory and resets when the server restarts.
+- `GET /api/*` routes stay public. Only create, update and delete need an admin.
 
 ## Area API
 
@@ -137,7 +180,7 @@ Example request:
 ```http
 POST /api/interruptions
 Content-Type: application/json
-x-api-key: <ADMIN_API_KEY>
+Authorization: Bearer <token>
 
 {
   "title": "Jaro Power Interruption",
@@ -168,6 +211,8 @@ feeders >──< power_interruptions (through interruption_feeders)
 | `power_interruptions` | Brownout advisories: date, time, reason, status, estimated restoration |
 | `interruption_areas` | Which areas each interruption affects |
 | `interruption_feeders` | Which feeders each interruption affects |
+| `admins` | Admin accounts: email (unique, ignoring case), name, scrypt password hash |
+| `admin_sessions` | Signed-in sessions: a hash of each token and when it expires |
 
 - `status` is limited to `scheduled`, `ongoing`, `restored` or `cancelled`.
 - Every main table has `created_at` and `updated_at`; triggers refresh `updated_at` on each change.
@@ -190,12 +235,15 @@ backend/
     │   ├── migrate.js          creates the tables
     │   ├── seed-data.js        starting data
     │   ├── seed.js             inserts the starting data
+    │   ├── create-admin.js     creates an admin account
     │   └── verify.js           CRUD checks
+    ├── auth/                   password hashing and session tokens
     ├── app.js, index.js        Express app and server start
-    ├── routes/                 area and interruption endpoints
-    ├── middleware/             admin key check, JSON body check, success and error responses
-    ├── validation/             request checks for areas and interruptions
+    ├── routes/                 auth, area and interruption endpoints
+    ├── middleware/             admin sign-in check, login rate limit, JSON body check, responses
+    ├── validation/             request checks for login, areas and interruptions
     └── repositories/
+        ├── adminRepository.js          admins and their sessions
         ├── areaRepository.js           areas and feeders
         └── interruptionRepository.js   power interruptions
 ```

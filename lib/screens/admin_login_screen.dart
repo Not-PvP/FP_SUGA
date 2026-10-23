@@ -1,8 +1,13 @@
-
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:suga/providers/auth_provider.dart';
 
 class AdminLoginScreen extends StatefulWidget {
-  const AdminLoginScreen({super.key});
+  const AdminLoginScreen({super.key, this.closeOnSuccess = true});
+
+  // Go back to the previous screen after signing in. Turned off when the screen
+  // is shown in place of an admin-only screen, which then appears by itself.
+  final bool closeOnSuccess;
 
   @override
   State<AdminLoginScreen> createState() => _AdminLoginScreenState();
@@ -20,6 +25,16 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   static const cardColor = Color(0xFF111720);
   static const borderColor = Color(0xFF292F38);
   static const secondaryText = Color(0xFF9CA3AF);
+
+  @override
+  void initState() {
+    super.initState();
+    // Do not show a failed attempt from an earlier visit. After the first frame,
+    // because notifyListeners() must not run during a build.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<AuthProvider>().clearError();
+    });
+  }
 
   @override
   void dispose() {
@@ -48,6 +63,11 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: borderColor),
       ),
+      // Used while signing in, when the fields are locked.
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: borderColor),
+      ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(color: amber, width: 1.3),
@@ -63,18 +83,66 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     );
   }
 
-  void _handleLogin() {
+  // After signing in, the admin goes back to the app, where the admin buttons now show.
+  Future<void> _handleLogin() async {
+    final auth = context.read<AuthProvider>();
+    if (auth.isSigningIn) return;
     if (!_formKey.currentState!.validate()) return;
+    FocusScope.of(context).unfocus();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Admin authentication is not connected yet.'),
+    final signedIn = await auth.login(
+      _emailController.text,
+      _passwordController.text,
+    );
+    if (!mounted) return;
+    if (!signedIn) {
+      _passwordController.clear();
+      return;
+    }
+    if (widget.closeOnSuccess) {
+      final messenger = ScaffoldMessenger.of(context);
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Signed in as ${auth.admin?.displayName ?? 'admin'}. Admin tools are now on.')),
+      );
+    }
+  }
+
+  Widget _buildMessage({required String text, required bool isError}) {
+    final color = isError ? const Color(0xFFF87171) : amber;
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 20),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            isError ? Icons.error_outline_rounded : Icons.schedule_rounded,
+            color: color,
+            size: 18,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: color, fontSize: 13, height: 1.4),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    final message = auth.error ?? auth.notice;
     return Scaffold(
       backgroundColor: background,
       body: SafeArea(
@@ -159,6 +227,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       ),
                       const SizedBox(height: 24),
 
+                      if (message != null)
+                        _buildMessage(
+                          text: message,
+                          isError: auth.error != null,
+                        ),
+
                       const Text(
                         'Email address',
                         style: TextStyle(
@@ -170,7 +244,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       const SizedBox(height: 10),
                       TextFormField(
                         controller: _emailController,
+                        enabled: !auth.isSigningIn,
                         keyboardType: TextInputType.emailAddress,
+                        autofillHints: const [AutofillHints.email],
                         textInputAction: TextInputAction.next,
                         style: const TextStyle(
                           color: Colors.white,
@@ -206,7 +282,9 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                       const SizedBox(height: 10),
                       TextFormField(
                         controller: _passwordController,
+                        enabled: !auth.isSigningIn,
                         obscureText: _obscurePassword,
+                        autofillHints: const [AutofillHints.password],
                         textInputAction: TextInputAction.done,
                         onFieldSubmitted: (_) => _handleLogin(),
                         style: const TextStyle(
@@ -245,29 +323,40 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _handleLogin,
+                          onPressed: auth.isSigningIn ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: amber,
                             foregroundColor: background,
+                            disabledBackgroundColor: amber.withValues(alpha: 0.6),
+                            disabledForegroundColor: background,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),
                           ),
-                          child: const Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(Icons.login_rounded, size: 19),
-                              SizedBox(width: 10),
-                              Text(
-                                'Sign In',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
+                          child: auth.isSigningIn
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2.4,
+                                    color: background,
+                                  ),
+                                )
+                              : const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.login_rounded, size: 19),
+                                    SizedBox(width: 10),
+                                    Text(
+                                      'Sign In',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
                     ],

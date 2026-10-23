@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:suga/providers/notification_provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/models/area.dart';
 import 'package:suga/services/area_service.dart';
@@ -78,10 +79,19 @@ class HomeScreen extends StatelessWidget {
                       onPressed: () {
                         Navigator.pushNamed(context, '/notifications');
                       },
-                      icon: const Icon(
-                        Icons.notifications_none_rounded,
-                        color: Color(0xFFFFBF00),
-                        size: 23,
+                      tooltip: 'Notifications',
+                      // The number of unread alerts, when there are any.
+                      icon: Consumer<NotificationProvider>(
+                        builder: (context, notifications, _) => Badge(
+                          isLabelVisible: notifications.unreadCount > 0,
+                          label: Text('${notifications.unreadCount}'),
+                          backgroundColor: const Color(0xFFF87171),
+                          child: const Icon(
+                            Icons.notifications_none_rounded,
+                            color: Color(0xFFFFBF00),
+                            size: 23,
+                          ),
+                        ),
                       ),
                     ),
                   ),

@@ -40,6 +40,13 @@ dependencies:
   http: ^1.6.0
   provider: ^6.1.2
   intl: ^0.20.2
+  # Keeps the admin's session token encrypted on the device (Android Keystore / iOS Keychain).
+  flutter_secure_storage: ^11.2.0
+  # Brownout reminders on the phone, scheduled in Philippine time.
+  flutter_local_notifications: ^22.3.2
+  timezone: ^0.11.0
+  # Notification settings and read/unread state.
+  shared_preferences: ^2.5.6
 
 dev_dependencies:
   flutter_test:

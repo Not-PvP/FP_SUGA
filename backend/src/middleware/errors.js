@@ -49,6 +49,7 @@ export function errorHandler(err, _req, res, _next) {
     console.error(err);
     httpError = new HttpError(500, 'INTERNAL_ERROR', 'Something went wrong');
   }
+  if (httpError.retryAfter) res.set('Retry-After', String(httpError.retryAfter));
   const error = { code: httpError.code, message: httpError.message };
   if (httpError.details) error.details = httpError.details;
   res.status(httpError.status).json({ success: false, error });

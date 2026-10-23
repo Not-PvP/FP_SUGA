@@ -4,7 +4,9 @@ import 'package:suga/services/area_service.dart';
 import 'package:provider/provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:suga/screens/admin_login_screen.dart';
+import 'package:suga/providers/auth_provider.dart';
+import 'package:suga/providers/notification_provider.dart';
+import 'package:suga/routes/app_routes.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.onNavigateToAreas});
@@ -17,287 +19,311 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   late Future<List<Area>> _areasFuture;
-  bool _pushNotificationsEnabled = true;
-  String _alertLeadTime = '2 hours before';
-  bool _powerRestoredAlerts = true;
+  // Push, lead time and power restored settings live in NotificationProvider,
+  // so they are saved and used to schedule reminders.
   bool _weatherAlerts = false;
 
   Widget _buildNotificationsSection() {
+
     const cardColor = Color(0xFF111720);
     const borderColor = Color(0xFF292F38);
     const secondaryText = Color(0xFF9CA3AF);
 
     Widget settingDivider() => const Divider(color: borderColor, height: 1);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(0, 12, 0, 12),
-          child: Text(
-            'NOTIFICATIONS',
-            style: TextStyle(
-              color: secondaryText,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.5,
-            ),
-          ),
-        ),
-
-        Container(
-          margin: const EdgeInsets.fromLTRB(0, 0, 0, 24),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            children: [
-              // Master push notification toggle
-              _buildAlertToggle(
-                title: 'Push Notifications',
-                subtitle: 'Still receive alerts from SUGA',
-                value: _pushNotificationsEnabled,
-                enabled: true,
-                onChanged: (value) {
-                  setState(() {
-                    _pushNotificationsEnabled = value;
-                  });
-                },
+    // Rebuilds when a notification setting changes.
+    return Consumer<NotificationProvider>(
+      builder: (context, notifications, _) {
+        final pushEnabled = notifications.pushEnabled;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(0, 12, 0, 12),
+              child: Text(
+                'NOTIFICATIONS',
+                style: TextStyle(
+                  color: secondaryText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
+                ),
               ),
-              settingDivider(),
+            ),
 
-              // Alert reminder timing
-              Opacity(
-                opacity: _pushNotificationsEnabled ? 1 : 0.45,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  child: Row(
+            Container(
+              margin: const EdgeInsets.fromLTRB(0, 0, 0, 24),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: borderColor),
+              ),
+              child: Column(
+                children: [
+                  // Master push notification toggle
+                  _buildAlertToggle(
+                    title: 'Push Notifications',
+                    subtitle: 'Still receive alerts from SUGA',
+                    value: pushEnabled,
+                    enabled: true,
+                    onChanged: notifications.setPushEnabled,
+                  ),
+                  settingDivider(),
+
+                  // Alert reminder timing
+                  Opacity(
+                    opacity: pushEnabled ? 1 : 0.45,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Alert me before',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                                SizedBox(height: 4),
+                                Text(
+                                  'Upcoming scheduled brownouts',
+                                  style: TextStyle(
+                                    color: Color(0xFF9CA3AF),
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            height: 48,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF070A0F),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF292F38)),
+                            ),
+                            child: DropdownButton<int>(
+                              value: notifications.leadMinutes,
+                              isDense: false,
+                              underline: const SizedBox.shrink(),
+                              dropdownColor: const Color(0xFF111720),
+                              icon: const Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: Color(0xFFFFBF00),
+                              ),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                              ),
+                              items: [
+                                for (final minutes in NotificationProvider.leadTimeOptions)
+                                  DropdownMenuItem(
+                                    value: minutes,
+                                    child: Text(NotificationProvider.leadTimeLabel(minutes)),
+                                  ),
+                              ],
+                              onChanged: !pushEnabled
+                                  ? null
+                                  : (value) {
+                                      if (value == null) return;
+                                      notifications.setLeadMinutes(value);
+                                    },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  settingDivider(),
+
+                  // Power restoration alerts
+                  _buildAlertToggle(
+                    title: 'Power Restored Alerts',
+                    subtitle: 'Know when electricity returns',
+                    value: notifications.restoredAlerts,
+                    enabled: pushEnabled,
+                    onChanged: notifications.setRestoredAlerts,
+                  ),
+
+                  settingDivider(),
+
+                  // Weather alerts
+                  _buildAlertToggle(
+                    title: 'Weather Alerts',
+                    subtitle: 'Get notified about severe weather',
+                    value: _weatherAlerts,
+                    enabled: pushEnabled,
+                    onChanged: (value) {
+                      setState(() {
+                        _weatherAlerts = value;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAdminSection() {
+    const amber = Color(0xFFFFBF00);
+    const danger = Color(0xFFF87171);
+    const cardColor = Color(0xFF111720);
+    const borderColor = Color(0xFF292F38);
+    const secondaryText = Color(0xFF9CA3AF);
+
+    // Rebuilds when the admin signs in or out, or the session expires.
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        final admin = auth.admin;
+        final signedIn = admin != null;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.fromLTRB(0, 12, 0, 12),
+              child: Text(
+                'ADMIN',
+                style: TextStyle(
+                  color: secondaryText,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 1.5,
+                ),
+              ),
+            ),
+            Container(
+              margin: const EdgeInsets.only(bottom: 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: cardColor,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: signedIn ? amber.withValues(alpha: 0.5) : borderColor,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      const Expanded(
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF292315),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          signedIn
+                              ? Icons.verified_user_outlined
+                              : Icons.admin_panel_settings_outlined,
+                          color: amber,
+                          size: 26,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Alert me before',
-                              style: TextStyle(
+                              signedIn ? 'Signed in as admin' : 'Admin Login',
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
-                              'Upcoming scheduled brownouts',
-                              style: TextStyle(
-                                color: Color(0xFF9CA3AF),
+                              signedIn
+                                  ? admin.email
+                                  : 'Manage advisories and feeder information',
+                              style: const TextStyle(
+                                color: secondaryText,
                                 fontSize: 12,
                               ),
                             ),
                           ],
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        height: 48,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF070A0F),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF292F38)),
-                        ),
-                        child: DropdownButton<String>(
-                          value: _alertLeadTime,
-                          isDense: false,
-                          underline: const SizedBox.shrink(),
-                          dropdownColor: const Color(0xFF111720),
-                          icon: const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: Color(0xFFFFBF00),
-                          ),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                          ),
-                          items: const [
-                            DropdownMenuItem(
-                              value: '10 minutes before',
-                              child: Text('10 minutes'),
-                            ),
-                            DropdownMenuItem(
-                              value: '1 hour before',
-                              child: Text('1 hour'),
-                            ),
-                            DropdownMenuItem(
-                              value: '2 hours before',
-                              child: Text('2 hours'),
-                            ),
-                            DropdownMenuItem(
-                              value: '12 hours before',
-                              child: Text('12 hours'),
-                            ),
-                            DropdownMenuItem(
-                              value: '24 hours before',
-                              child: Text('24 hours'),
-                            ),
-                          ],
-                          onChanged: !_pushNotificationsEnabled
-                              ? null
-                              : (value) {
-                                  if (value == null) return;
-                                  setState(() => _alertLeadTime = value);
-                                },
-                        ),
-                      ),
                     ],
                   ),
-                ),
-              ),
-
-              settingDivider(),
-
-              // Power restoration alerts
-              _buildAlertToggle(
-                title: 'Power Restored Alerts',
-                subtitle: 'Know when electricity returns',
-                value: _powerRestoredAlerts,
-                enabled: _pushNotificationsEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _powerRestoredAlerts = value;
-                  });
-                },
-              ),
-
-              settingDivider(),
-
-              // Weather alerts
-              _buildAlertToggle(
-                title: 'Weather Alerts',
-                subtitle: 'Get notified about severe weather',
-                value: _weatherAlerts,
-                enabled: _pushNotificationsEnabled,
-                onChanged: (value) {
-                  setState(() {
-                    _weatherAlerts = value;
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAdminSection() {
-    const amber = Color(0xFFFFBF00);
-    const cardColor = Color(0xFF111720);
-    const borderColor = Color(0xFF292F38);
-    const secondaryText = Color(0xFF9CA3AF);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(0, 12, 0, 12),
-          child: Text(
-            'ADMIN',
-            style: TextStyle(
-              color: secondaryText,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.5,
-            ),
-          ),
-        ),
-        Container(
-          margin: const EdgeInsets.only(bottom: 24),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
+                  if (signedIn) ...[
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Admin tools are shown on Scheduled Brownouts and on each advisory.',
+                      style: TextStyle(color: Color(0xFFD1D5DB), fontSize: 12),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
                     height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF292315),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Icon(
-                      Icons.admin_panel_settings_outlined,
-                      color: amber,
-                      size: 26,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Admin Login',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                    child: signedIn
+                        ? OutlinedButton.icon(
+                            onPressed: () async {
+                              final messenger = ScaffoldMessenger.of(context);
+                              await context.read<AuthProvider>().logout();
+                              messenger.showSnackBar(
+                                const SnackBar(
+                                  content: Text('Signed out. Admin tools are hidden.'),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.logout_rounded, size: 18),
+                            label: const Text('Sign Out'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: danger,
+                              side: BorderSide(color: danger.withValues(alpha: 0.5)),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          )
+                        : ElevatedButton.icon(
+                            onPressed: () =>
+                                Navigator.pushNamed(context, AppRoutes.adminLogin),
+                            icon: const Icon(Icons.login_rounded, size: 18),
+                            label: const Text('Open Admin Portal'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: amber,
+                              foregroundColor: const Color(0xFF070A0F),
+                              elevation: 0,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              textStyle: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Manage advisories and feeder information',
-                          style: TextStyle(
-                            color: Color(0xFF9CA3AF),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const AdminLoginScreen(),
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.login_rounded, size: 18),
-                  label: const Text('Open Admin Portal'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: amber,
-                    foregroundColor: const Color(0xFF070A0F),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+            ),
+          ],
+        );
+      },
     );
   }
 

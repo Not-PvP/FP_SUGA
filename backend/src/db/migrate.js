@@ -6,6 +6,8 @@ import { db } from './client.js';
 
 // Child tables first, so dropping does not break foreign keys.
 const TABLES = [
+  'admin_sessions',
+  'admins',
   'interruption_feeders',
   'interruption_areas',
   'power_interruptions',
