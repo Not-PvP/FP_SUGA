@@ -48,6 +48,27 @@ CREATE TABLE IF NOT EXISTS interruption_feeders (
   PRIMARY KEY (interruption_id, feeder_id)
 );
 
+-- Admin accounts. Passwords are stored as scrypt hashes, never as plain text.
+CREATE TABLE IF NOT EXISTS admins (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  email          TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+  name           TEXT    NOT NULL DEFAULT '',
+  password_hash  TEXT    NOT NULL,
+  created_at     TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- One row per signed-in device. Only a SHA-256 hash of the token is stored,
+-- so a leaked database cannot be used to sign in.
+CREATE TABLE IF NOT EXISTS admin_sessions (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  admin_id    INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
+  token_hash  TEXT    NOT NULL UNIQUE,
+  expires_at  TEXT    NOT NULL,                      -- ISO 8601, UTC
+  created_at  TEXT    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_admin_sessions_admin ON admin_sessions(admin_id);
 CREATE INDEX IF NOT EXISTS idx_feeders_area ON feeders(area_id);
 CREATE INDEX IF NOT EXISTS idx_interruptions_date ON power_interruptions(date);
 CREATE INDEX IF NOT EXISTS idx_interruption_areas_area ON interruption_areas(area_id);
@@ -70,4 +91,10 @@ CREATE TRIGGER IF NOT EXISTS trg_interruptions_updated_at
 AFTER UPDATE ON power_interruptions FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
 BEGIN
   UPDATE power_interruptions SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_admins_updated_at
+AFTER UPDATE ON admins FOR EACH ROW WHEN NEW.updated_at = OLD.updated_at
+BEGIN
+  UPDATE admins SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 END;
