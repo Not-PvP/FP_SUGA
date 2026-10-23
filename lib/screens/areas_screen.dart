@@ -45,7 +45,8 @@ class _AreasScreenState extends State<AreasScreen> {
 
   // Area Details returns true when the user tapped "Set as home area".
   Future<void> _open(Area area) async {
-    final setAsHome = await Navigator.pushNamed<bool>(
+    // Not pushNamed<bool>: the routes in AppRoutes are untyped, so a typed push fails at runtime.
+    final setAsHome = await Navigator.pushNamed(
       context,
       AppRoutes.areaDetails,
       arguments: area.id,

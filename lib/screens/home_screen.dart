@@ -95,9 +95,9 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTopBar() {
     return Row(
       children: [
-        const Semantics(
+        Semantics(
           header: true,
-          child: Text(
+          child: const Text(
             'SUGA',
             style: TextStyle(
               fontFamily: AppText.font,
