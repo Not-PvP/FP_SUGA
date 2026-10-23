@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:suga/models/power_interruption.dart';
 import 'package:intl/intl.dart';
 import 'package:suga/providers/auth_provider.dart';
+import 'package:suga/providers/notification_provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
+import 'package:suga/utils/advisory_time.dart';
 import 'package:suga/widgets/admin_advisory_actions.dart';
 import 'package:suga/widgets/weather_card.dart';
 
@@ -18,6 +20,13 @@ class BrownoutDetailsScreen extends StatelessWidget {
     final brownout =
         context.watch<PowerInterruptionProvider>().findById(passed.id) ?? passed;
     final isAdmin = context.watch<AuthProvider>().isSignedIn;
+    final notifications = context.watch<NotificationProvider>();
+    final hasReminder = notifications.hasReminder(brownout);
+    // Reminders are only for brownouts that are still coming up.
+    final start = advisoryStart(brownout);
+    final canRemind = brownout.status.toLowerCase() == 'scheduled' &&
+        start != null &&
+        start.isAfter(DateTime.now());
     final status = brownout.status.toLowerCase();
     final statusColor = switch (status) {
       'scheduled' => const Color(0xFFFBBF24),
@@ -282,18 +291,39 @@ class BrownoutDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            // Notify Before Interruption
+            // Notify Before Interruption: schedules a phone reminder for this advisory.
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () {
-                  // TODO: Connect to notification scheduling.
-                },
-                icon: const Icon(Icons.notifications_active_outlined, size: 20),
-                label: const Text('Notify Me Before Interruption'),
+                onPressed: !canRemind
+                    ? null
+                    : () async {
+                        final messenger = ScaffoldMessenger.of(context);
+                        final willFire = await notifications.remindMe(brownout);
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(willFire
+                              ? "We'll remind you ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} before it starts."
+                              : 'Saved to your alerts. Allow notifications to get a phone reminder.'),
+                        ));
+                      },
+                icon: Icon(
+                  hasReminder
+                      ? Icons.notifications_active_rounded
+                      : Icons.notifications_active_outlined,
+                  size: 20,
+                ),
+                label: Text(
+                  !canRemind
+                      ? 'No Reminder for This Advisory'
+                      : hasReminder
+                          ? 'Reminder Set · ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} Before'
+                          : 'Notify Me Before Interruption',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFBF00),
                   foregroundColor: const Color(0xFF070A0F),
+                  disabledBackgroundColor: const Color(0xFF1F2937),
+                  disabledForegroundColor: const Color(0xFF9CA3AF),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
