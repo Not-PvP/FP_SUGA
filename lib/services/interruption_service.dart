@@ -10,8 +10,8 @@ class InterruptionService {
 
   final ApiClient _api;
 
-  // Needed for create, update and delete. Set after the admin logs in.
-  set adminKey(String? key) => _api.adminKey = key;
+  // Needed for create, update and delete. AuthProvider sets it after the admin signs in.
+  set authToken(String? token) => _api.authToken = token;
 
   // Pass [areaId] to get only the interruptions that affect that area.
   Future<List<PowerInterruption>> fetchInterruptions({int? areaId}) async {

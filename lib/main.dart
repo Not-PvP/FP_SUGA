@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'providers/auth_provider.dart';
 import 'providers/power_interruption_provider.dart';
 import 'routes/app_routes.dart';
 
@@ -15,7 +16,15 @@ class MyApp extends StatelessWidget {
     // Providers above MaterialApp are shared by every screen and route.
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => PowerInterruptionProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()..restoreSession()),
+        // Rebuilt whenever AuthProvider changes, so admin requests always carry the
+        // current session token, and a 401 from the server signs the admin out.
+        ChangeNotifierProxyProvider<AuthProvider, PowerInterruptionProvider>(
+          create: (_) => PowerInterruptionProvider(),
+          update: (_, auth, interruptions) => interruptions!
+            ..authToken = auth.token
+            ..onUnauthorized = auth.handleUnauthorized,
+        ),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,

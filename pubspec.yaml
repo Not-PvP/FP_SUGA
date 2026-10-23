@@ -40,6 +40,8 @@ dependencies:
   http: ^1.6.0
   provider: ^6.1.2
   intl: ^0.20.2
+  # Keeps the admin's session token encrypted on the device (Android Keystore / iOS Keychain).
+  flutter_secure_storage: ^11.2.0
 
 dev_dependencies:
   flutter_test:

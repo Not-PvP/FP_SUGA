@@ -119,7 +119,7 @@ void main() {
       sent = r;
       return _ok(_json(9, date: '2026-10-20'), 201);
     });
-    provider.adminKey = 'secret';
+    provider.authToken = 'secret';
     await provider.loadInterruptions();
 
     final saved = await provider.addInterruption(_new);
@@ -127,7 +127,7 @@ void main() {
     expect(saved, isTrue);
     expect(sent.method, 'POST');
     expect(sent.url.path, '/api/interruptions');
-    expect(sent.headers['x-api-key'], 'secret');
+    expect(sent.headers['authorization'], 'Bearer secret');
     final body = jsonDecode(sent.body) as Map<String, dynamic>;
     expect(body['start_time'], '08:00');
     expect(body['area_ids'], [3]);
@@ -179,12 +179,15 @@ void main() {
     var deleteFails = true;
     final provider = _provider((r) async {
       if (r.method == 'GET') return _ok([_json(1), _json(2)]);
-      return deleteFails ? _error(401, 'A valid x-api-key header is required') : http.Response('', 204);
+      return deleteFails ? _error(401, 'Your session has expired. Sign in again.') : http.Response('', 204);
     });
+    ApiException? unauthorized;
+    provider.onUnauthorized = (e) => unauthorized = e;
     await provider.loadInterruptions();
 
     expect(await provider.deleteInterruption('1'), isFalse);
-    expect(provider.actionError, 'A valid x-api-key header is required');
+    expect(provider.actionError, 'Your session has expired. Sign in again.');
+    expect(unauthorized?.statusCode, 401, reason: 'a 401 must be reported so the app can sign out');
     expect(provider.interruptions, hasLength(2));
 
     deleteFails = false;

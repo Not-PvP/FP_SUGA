@@ -4,12 +4,23 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiException implements Exception {
-  const ApiException(this.message, {this.statusCode, this.details = const {}});
+  const ApiException(
+    this.message, {
+    this.statusCode,
+    this.code,
+    this.details = const {},
+  });
 
   final String message;
 
   // HTTP status of the error response, or null when the server could not be reached.
   final int? statusCode;
+
+  // The API's error code, e.g. 'SESSION_EXPIRED' or 'INVALID_CREDENTIALS'.
+  final String? code;
+
+  // 401: not signed in, wrong password, or the session ended. The admin has to sign in again.
+  bool get isUnauthorized => statusCode == 401;
 
   // Per-field validation messages from the API, e.g. {'end_time': 'must be later than start_time'}.
   final Map<String, String> details;
@@ -28,9 +39,9 @@ class ApiClient {
   final http.Client _client;
   final String baseUrl;
 
-  // Sent as the x-api-key header on POST, PATCH and DELETE (admin routes).
-  // Set it after the admin logs in. Never hard-code it in the app.
-  String? adminKey;
+  // The signed-in admin's session token, sent as "Authorization: Bearer <token>".
+  // AuthProvider sets it after login and clears it on logout. Never hard-code it.
+  String? authToken;
 
   // Override with --dart-define=API_BASE_URL=https://... for a real device or deployment.
   static const _configuredUrl = String.fromEnvironment('API_BASE_URL');
@@ -69,9 +80,9 @@ class ApiClient {
       request.headers['content-type'] = 'application/json';
       request.body = jsonEncode(body);
     }
-    final key = adminKey;
-    if (method != 'GET' && key != null && key.isNotEmpty) {
-      request.headers['x-api-key'] = key;
+    final token = authToken;
+    if (token != null && token.isNotEmpty) {
+      request.headers['authorization'] = 'Bearer $token';
     }
 
     final http.Response response;
@@ -101,10 +112,12 @@ class ApiClient {
     if (!ok || decoded['success'] != true) {
       final error = decoded['error'];
       final message = error is Map<String, dynamic> ? error['message'] as String? : null;
+      final code = error is Map<String, dynamic> ? error['code'] as String? : null;
       final details = error is Map<String, dynamic> ? error['details'] : null;
       throw ApiException(
         message ?? 'Request failed (${response.statusCode})',
         statusCode: response.statusCode,
+        code: code,
         details: details is Map<String, dynamic>
             ? details.map((field, text) => MapEntry(field, text.toString()))
             : const {},

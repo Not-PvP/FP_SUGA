@@ -50,8 +50,12 @@ class PowerInterruptionProvider extends ChangeNotifier {
   // Per-field messages from the API when the last add or update was rejected.
   Map<String, String> get fieldErrors => _fieldErrors;
 
-  // Needed for add, update and delete. Set after the admin logs in.
-  set adminKey(String? key) => _service.adminKey = key;
+  // Needed for add, update and delete. main.dart copies it from AuthProvider.
+  set authToken(String? token) => _service.authToken = token;
+
+  // Called when the server rejects an add, update or delete with 401, e.g. because
+  // the admin's session expired. main.dart points it at AuthProvider.handleUnauthorized.
+  void Function(ApiException error)? onUnauthorized;
 
   List<PowerInterruption> interruptionsForArea(int areaId) =>
       _all.where((item) => item.areaIds.contains(areaId)).toList();
@@ -211,6 +215,7 @@ class PowerInterruptionProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       _actionError = e.message;
       _fieldErrors = e.details;
+      if (e.isUnauthorized) onUnauthorized?.call(e);
       return false;
     } finally {
       _isSaving = false;
