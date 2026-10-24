@@ -9,6 +9,7 @@ import 'package:suga/screens/brownout_details_screen.dart';
 import 'package:suga/screens/notifications_screen.dart';
 import 'package:suga/screens/main_screen.dart';
 import 'package:suga/screens/admin_login_screen.dart';
+import 'package:suga/screens/brownout_form_screen.dart';
 
 class AppRoutes {
   static const String home = '/';
@@ -18,6 +19,7 @@ class AppRoutes {
   static const String areaDetails = '/area_details';
   static const String scheduledBrownouts = '/brownouts';
   static const String brownoutDetails = '/brownout_details';
+  static const String brownoutForm = '/admin/brownout-form';
   static const String notifications = '/notifications';
 
   // After signing in, admins use the normal screens, which then show admin buttons.
@@ -30,6 +32,7 @@ class AppRoutes {
     areaDetails: (_) => const AreaDetailsScreen(),
     scheduledBrownouts: (_) => const ScheduledBrownoutsScreen(),
     brownoutDetails: (_) => const BrownoutDetailsScreen(),
+    brownoutForm: (_) => const BrownoutFormScreen(),
     notifications: (_) => const NotificationsScreen(),
     adminLogin: (_) => const AdminLoginScreen(),
   };

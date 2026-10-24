@@ -8,6 +8,7 @@ import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/utils/advisory_time.dart';
 import 'package:suga/widgets/admin_advisory_actions.dart';
 import 'package:suga/widgets/weather_card.dart';
+import 'package:suga/routes/app_routes.dart';
 
 class BrownoutDetailsScreen extends StatelessWidget {
   const BrownoutDetailsScreen({super.key});
@@ -18,13 +19,15 @@ class BrownoutDetailsScreen extends StatelessWidget {
         ModalRoute.of(context)?.settings.arguments as PowerInterruption;
     // Use the provider's copy, so a change made by an admin shows right away.
     final brownout =
-        context.watch<PowerInterruptionProvider>().findById(passed.id) ?? passed;
+        context.watch<PowerInterruptionProvider>().findById(passed.id) ??
+        passed;
     final isAdmin = context.watch<AuthProvider>().isSignedIn;
     final notifications = context.watch<NotificationProvider>();
     final hasReminder = notifications.hasReminder(brownout);
     // Reminders are only for brownouts that are still coming up.
     final start = advisoryStart(brownout);
-    final canRemind = brownout.status.toLowerCase() == 'scheduled' &&
+    final canRemind =
+        brownout.status.toLowerCase() == 'scheduled' &&
         start != null &&
         start.isAfter(DateTime.now());
     final status = brownout.status.toLowerCase();
@@ -124,7 +127,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: Column(
@@ -159,29 +162,75 @@ class BrownoutDetailsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.35),
-                    ),
-                  ),
 
-                  child: Text(
-                    brownout.status[0].toUpperCase() +
-                        brownout.status.substring(1).toLowerCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                if (isAdmin)
+                  InkWell(
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.brownoutForm,
+                        arguments: brownout,
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFBF00).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(
+                            0xFFFFBF00,
+                          ).withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 14,
+                            color: Color(0xFFFFBF00),
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Edit',
+                            style: TextStyle(
+                              color: Color(0xFFFFBF00),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Text(
+                      brownout.status[0].toUpperCase() +
+                          brownout.status.substring(1).toLowerCase(),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
 
@@ -300,11 +349,15 @@ class BrownoutDetailsScreen extends StatelessWidget {
                     : () async {
                         final messenger = ScaffoldMessenger.of(context);
                         final willFire = await notifications.remindMe(brownout);
-                        messenger.showSnackBar(SnackBar(
-                          content: Text(willFire
-                              ? "We'll remind you ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} before it starts."
-                              : 'Saved to your alerts. Allow notifications to get a phone reminder.'),
-                        ));
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              willFire
+                                  ? "We'll remind you ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} before it starts."
+                                  : 'Saved to your alerts. Allow notifications to get a phone reminder.',
+                            ),
+                          ),
+                        );
                       },
                 icon: Icon(
                   hasReminder
@@ -316,8 +369,8 @@ class BrownoutDetailsScreen extends StatelessWidget {
                   !canRemind
                       ? 'No Reminder for This Advisory'
                       : hasReminder
-                          ? 'Reminder Set · ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} Before'
-                          : 'Notify Me Before Interruption',
+                      ? 'Reminder Set · ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} Before'
+                      : 'Notify Me Before Interruption',
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFBF00),
