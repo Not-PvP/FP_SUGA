@@ -54,7 +54,9 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
             child: Text(
               label,
               style: TextStyle(
-                color: selected ? const Color(0xFFFFBF00) : const Color(0xFF9CA3AF),
+                color: selected
+                    ? const Color(0xFFFFBF00)
+                    : const Color(0xFF9CA3AF),
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
               ),
@@ -132,7 +134,10 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
                             const SizedBox(height: 6),
                             Text(
                               _formatWhen(item),
-                              style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
+                              style: const TextStyle(
+                                color: Color(0xFF9CA3AF),
+                                fontSize: 12,
+                              ),
                             ),
                           ],
                         ),
@@ -152,8 +157,12 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
   static String _formatWhen(PowerInterruption item) {
     try {
       final date = DateFormat('MMM d, y').format(DateTime.parse(item.date));
-      final start = DateFormat('h:mm a').format(DateFormat('HH:mm').parse(item.startTime));
-      final end = DateFormat('h:mm a').format(DateFormat('HH:mm').parse(item.endTime));
+      final start = DateFormat(
+        'h:mm a',
+      ).format(DateFormat('HH:mm').parse(item.startTime));
+      final end = DateFormat(
+        'h:mm a',
+      ).format(DateFormat('HH:mm').parse(item.endTime));
       return '$date · $start – $end';
     } catch (_) {
       return '${item.date} · ${item.startTime} – ${item.endTime}';
@@ -186,7 +195,6 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
           ],
         ),
       );
-
     } else {
       body = RefreshIndicator(
         onRefresh: provider.loadInterruptions,
@@ -196,7 +204,10 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
           children: [
             showAll
                 ? _buildAllAdvisories(items)
-                : const UpcomingAdvisoriesWidget(showHeader: false, groupByDate: true),
+                : const UpcomingAdvisoriesWidget(
+                    showHeader: false,
+                    groupByDate: true,
+                  ),
           ],
         ),
       );
@@ -209,24 +220,73 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Header
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: Column(
+
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Scheduled Brownouts',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w600,
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Scheduled Brownouts',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          'Stay informed about upcoming power interruptions.',
+                          style: TextStyle(
+                            color: Color(0xFF9CA3AF),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Stay informed about upcoming power interruptions.',
-                    style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-                  ),
+                  if (isAdmin) ...[
+                    const SizedBox(width: 12),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final result = await Navigator.pushNamed(
+                            context,
+                            AppRoutes.brownoutForm,
+                          );
+
+                          if (result == true && context.mounted) {
+                            await context
+                                .read<PowerInterruptionProvider>()
+                                .loadInterruptions();
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFFFFBF00),
+                          side: const BorderSide(color: Color(0xFFFFBF00)),
+                          backgroundColor: const Color(0xFF292315),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                          textStyle: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        child: const Text('Add +'),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
