@@ -19,6 +19,7 @@ class AreasScreen extends StatefulWidget {
 class _AreasScreenState extends State<AreasScreen> {
   late final AreaService _service = widget.service ?? AreaService();
   late Future<List<Area>> _areas = _service.fetchAreas();
+  final TextEditingController _searchController = TextEditingController();
   String _search = '';
   Timer? _searchDebounce;
 
@@ -44,6 +45,7 @@ class _AreasScreenState extends State<AreasScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -82,12 +84,33 @@ class _AreasScreenState extends State<AreasScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               child: TextField(
+                controller: _searchController,
                 style: const TextStyle(color: Colors.white),
+                cursorColor: const Color(0xFFFFBF00),
                 decoration: InputDecoration(
                   prefixIcon: const Icon(
                     Icons.search_rounded,
                     color: Color(0xFFFFBF00),
                   ),
+                  suffixIcon: _search.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Color(0xFFFFBF00),
+                            size: 20,
+                          ),
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            _searchDebounce?.cancel();
+                            _searchController.clear();
+
+                            setState(() {
+                              _search = '';
+                              _areas = _service.fetchAreas();
+                            });
+                          },
+                        ),
                   hintText: 'Search areas...',
                   hintStyle: const TextStyle(
                     color: Color(0xFF9CA3AF),
@@ -267,12 +290,12 @@ class _AreasScreenState extends State<AreasScreen> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: hasPowerOut
-                                              ? const Color(0xFF35191D)
-                                              : const Color(0xFF14271E),
+                                                ? const Color(0xFF35191D)
+                                                : const Color(0xFF14271E),
                                             border: Border.all(
                                               color: hasPowerOut
-                                                ? const Color(0xFFA9444D)
-                                                : const Color(0xFF347653),
+                                                  ? const Color(0xFFA9444D)
+                                                  : const Color(0xFF347653),
                                             ),
                                             borderRadius: BorderRadius.circular(
                                               30,
@@ -298,8 +321,8 @@ class _AreasScreenState extends State<AreasScreen> {
                                                     : 'Power On',
                                                 style: TextStyle(
                                                   color: hasPowerOut
-                                                    ? const Color(0xFFFFD6D9)
-                                                    : const Color(0xFF86EFAC),
+                                                      ? const Color(0xFFFFD6D9)
+                                                      : const Color(0xFF86EFAC),
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.w500,
                                                 ),
