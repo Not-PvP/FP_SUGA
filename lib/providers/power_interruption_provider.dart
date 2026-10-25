@@ -3,15 +3,23 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:suga/models/power_interruption.dart';
 import 'package:suga/services/interruption_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 // Shared power interruption state for every screen.
 // Screens read it with context.watch<PowerInterruptionProvider>() and call its
 // methods with context.read<PowerInterruptionProvider>().
 class PowerInterruptionProvider extends ChangeNotifier {
   PowerInterruptionProvider({InterruptionService? service})
-    : _service = service ?? InterruptionService();
+    : _service = service ?? InterruptionService() {
+    _preferencesLoad = _loadAreaPreferences();
+  }
 
   final InterruptionService _service;
+  static const _kSavedAreaIds = 'areas.savedAreaIds';
+  static const _kMainAreaId = 'areas.mainAreaId';
+
+  SharedPreferences? _prefs;
+  Future<void>? _preferencesLoad;
 
   List<PowerInterruption> _all = [];
   int? _selectedAreaId;
@@ -24,6 +32,52 @@ class PowerInterruptionProvider extends ChangeNotifier {
   Map<String, String> _fieldErrors = const {};
   Future<void>? _pendingLoad;
   bool _disposed = false;
+
+  Future<void> _loadAreaPreferences() async {
+    try {
+      _prefs = await SharedPreferences.getInstance();
+
+      final savedIds = (_prefs!.getStringList(_kSavedAreaIds) ?? [])
+          .map(int.tryParse)
+          .nonNulls
+          .toSet();
+
+      final mainAreaId = _prefs!.getInt(_kMainAreaId);
+
+      if (_savedAreaIds.isEmpty && _selectedAreaId == null) {
+        _savedAreaIds.addAll(savedIds);
+
+        _selectedAreaId = mainAreaId != null && savedIds.contains(mainAreaId)
+            ? mainAreaId
+            : null;
+      }
+
+      _notify();
+    } catch (e) {
+      debugPrint('Could not load saved areas: $e');
+    }
+  }
+
+  Future<void> _saveAreaPreferences() async {
+    try {
+      await _preferencesLoad;
+
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+
+      await prefs.setStringList(
+        _kSavedAreaIds,
+        _savedAreaIds.map((id) => id.toString()).toList(),
+      );
+
+      if (_selectedAreaId != null) {
+        await prefs.setInt(_kMainAreaId, _selectedAreaId!);
+      } else {
+        await prefs.remove(_kMainAreaId);
+      }
+    } catch (e) {
+      debugPrint('Could not save area preferences: $e');
+    }
+  }
 
   // Every interruption, soonest first.
   UnmodifiableListView<PowerInterruption> get allInterruptions =>
@@ -114,7 +168,10 @@ class PowerInterruptionProvider extends ChangeNotifier {
       changed = true;
     }
 
-    if (changed) _notify();
+    if (changed) {
+      _notify();
+      _saveAreaPreferences();
+    }
   }
 
   void setMainArea(int areaId) {
@@ -123,6 +180,7 @@ class PowerInterruptionProvider extends ChangeNotifier {
     if (_selectedAreaId != areaId) {
       _selectedAreaId = areaId;
       _notify();
+      _saveAreaPreferences();
     }
   }
 
@@ -132,6 +190,7 @@ class PowerInterruptionProvider extends ChangeNotifier {
 
     if (_savedAreaIds.remove(areaId)) {
       _notify();
+      _saveAreaPreferences();
     }
   }
 
@@ -146,6 +205,7 @@ class PowerInterruptionProvider extends ChangeNotifier {
     }
 
     _notify();
+    _saveAreaPreferences();
   }
 
   void clearActionError() {
