@@ -64,9 +64,7 @@ class _PowerStatusWidgetState extends State<PowerStatusWidget>
             .where((item) {
               final status = item.status.trim().toLowerCase();
 
-              if (status == 'cancelled' ||
-                  status == 'canceled' ||
-                  status == 'completed') {
+              if (status != 'ongoing') {
                 return false;
               }
 

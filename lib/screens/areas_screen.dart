@@ -5,6 +5,8 @@ import 'package:suga/services/area_service.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:suga/utils/advisory_time.dart';
 
 class AreasScreen extends StatefulWidget {
   const AreasScreen({super.key, this.service, this.onAreaSelected});
@@ -230,9 +232,36 @@ class _AreasScreenState extends State<AreasScreen> {
                     itemCount: areas.length,
                     itemBuilder: (context, i) {
                       final area = areas[i];
-                      final hasPowerOut = !context
-                          .watch<PowerInterruptionProvider>()
-                          .hasPowerInArea(area.id);
+                      final provider = context
+                          .watch<PowerInterruptionProvider>();
+
+                      final activeInterruption = provider
+                          .interruptionsForArea(area.id)
+                          .where((item) {
+                            final status = item.status.trim().toLowerCase();
+
+                            if (status != 'ongoing') return false;
+
+                            final start = advisoryStart(item);
+                            final end = advisoryEnd(item);
+                            final now = DateTime.now().toUtc();
+
+                            if (start == null || end == null) return false;
+
+                            return !now.isBefore(start.toUtc()) &&
+                                now.isBefore(end.toUtc());
+                          })
+                          .firstOrNull;
+
+                      final hasPowerOut = activeInterruption != null;
+
+                      final outageStart = activeInterruption == null
+                          ? null
+                          : advisoryStart(activeInterruption);
+
+                      final outageStartLabel = outageStart == null
+                          ? null
+                          : DateFormat('h:mm a').format(outageStart);
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -332,9 +361,9 @@ class _AreasScreenState extends State<AreasScreen> {
                                         ),
                                         if (hasPowerOut) ...[
                                           const SizedBox(width: 10),
-                                          const Text(
-                                            'Since 2:30 PM',
-                                            style: TextStyle(
+                                          Text(
+                                            'Since $outageStartLabel',
+                                            style: const TextStyle(
                                               color: Color(0xFFFCA5A5),
                                               fontSize: 11,
                                             ),
