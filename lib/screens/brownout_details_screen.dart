@@ -9,6 +9,8 @@ import 'package:suga/utils/advisory_time.dart';
 import 'package:suga/widgets/admin_advisory_actions.dart';
 import 'package:suga/widgets/weather_card.dart';
 import 'package:suga/routes/app_routes.dart';
+import 'package:suga/models/area.dart';
+import 'package:suga/services/area_service.dart';
 
 class BrownoutDetailsScreen extends StatelessWidget {
   const BrownoutDetailsScreen({super.key});
@@ -336,7 +338,65 @@ class BrownoutDetailsScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Weather Card
-            const WeatherCard(),
+            FutureBuilder<List<Area>>(
+              future: AreaService().fetchAreas(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Text(
+                    'Unable to load weather for this area.',
+                    style: TextStyle(color: Color(0xFF9CA3AF)),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFFFBF00)),
+                  );
+                }
+
+                if (!snapshot.hasData) {
+                  return const Text(
+                    'Weather area information is unavailable.',
+                    style: TextStyle(color: Color(0xFF9CA3AF)),
+                  );
+                }
+
+                // Use the first affected area that matches an area from the API.
+                final affectedAreaNames = brownout.affectedAreas
+                    .map((name) => name.trim().toLowerCase())
+                    .toSet();
+
+                final matchingAreas = snapshot.data!.where(
+                  (area) => affectedAreaNames.contains(
+                    area.name.trim().toLowerCase(),
+                  ),
+                );
+
+                if (start == null) {
+                  return const Text(
+                    'Weather unavailable: scheduled start time could not be determined.',
+                    style: TextStyle(color: Color(0xFF9CA3AF)),
+                  );
+                }
+
+                if (matchingAreas.isEmpty) {
+                  return Text(
+                    'Weather unavailable: no matching area found for '
+                    '${brownout.affectedAreas.join(', ')}.',
+                    style: const TextStyle(color: Color(0xFF9CA3AF)),
+                  );
+                }
+
+                final affectedArea = matchingAreas.first;
+
+                return WeatherCard(
+                  latitude: affectedArea.latitude,
+                  longitude: affectedArea.longitude,
+                  locationName: affectedArea.name,
+                  forecastDateTime: start,
+                );
+              },
+            ),
 
             const SizedBox(height: 16),
 

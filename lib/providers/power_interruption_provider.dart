@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:suga/models/power_interruption.dart';
 import 'package:suga/services/interruption_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:suga/utils/advisory_time.dart';
 
 // Shared power interruption state for every screen.
 // Screens read it with context.watch<PowerInterruptionProvider>() and call its
@@ -115,37 +116,26 @@ class PowerInterruptionProvider extends ChangeNotifier {
       _all.where((item) => item.areaIds.contains(areaId)).toList();
 
   bool hasPowerInArea(int areaId) {
-    final now = DateTime.now();
+    final now = DateTime.now().toUtc();
 
-    return !interruptionsForArea(areaId).any((item) {
-      if (item.status.toLowerCase() != 'active') return false;
+    final hasActiveOutage = interruptionsForArea(areaId).any((item) {
+      final status = item.status.trim().toLowerCase();
 
-      final date = DateTime.tryParse(item.date);
-      final start = item.startTime.split(':');
-      final end = item.endTime.split(':');
-
-      if (date == null || start.length < 2 || end.length < 2) {
+      if (status == 'cancelled' ||
+          status == 'canceled' ||
+          status == 'completed') {
         return false;
       }
 
-      final startTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        int.tryParse(start[0]) ?? 0,
-        int.tryParse(start[1]) ?? 0,
-      );
+      final start = advisoryStart(item);
+      final end = advisoryEnd(item);
 
-      final endTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        int.tryParse(end[0]) ?? 0,
-        int.tryParse(end[1]) ?? 0,
-      );
+      if (start == null || end == null) return false;
 
-      return !now.isBefore(startTime) && now.isBefore(endTime);
+      return !now.isBefore(start.toUtc()) && now.isBefore(end.toUtc());
     });
+
+    return !hasActiveOutage;
   }
 
   PowerInterruption? findById(String id) {
