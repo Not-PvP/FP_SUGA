@@ -620,10 +620,22 @@ class _BrownoutFormScreenState extends State<BrownoutFormScreen> {
                   backgroundColor: const Color(0xFF1F2937),
                   side: const BorderSide(color: Color(0xFF374151)),
                   deleteIconColor: _secondary,
+
                   onDeleted: saving
                       ? null
                       : () => setState(() {
                           _areaIds.remove(id);
+
+                          final remainingFeederIds = areas
+                              .where((area) => _areaIds.contains(area.id))
+                              .expand((area) => area.feeders)
+                              .map((feeder) => feeder.id)
+                              .toSet();
+
+                          _feederIds = _feederIds.intersection(
+                            remainingFeederIds,
+                          );
+
                           _clearError('area_ids');
                         }),
                 ),
