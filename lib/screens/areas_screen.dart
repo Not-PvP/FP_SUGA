@@ -5,6 +5,8 @@ import 'package:suga/services/area_service.dart';
 import 'dart:async';
 import 'package:provider/provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:suga/utils/advisory_time.dart';
 
 class AreasScreen extends StatefulWidget {
   const AreasScreen({super.key, this.service, this.onAreaSelected});
@@ -19,6 +21,7 @@ class AreasScreen extends StatefulWidget {
 class _AreasScreenState extends State<AreasScreen> {
   late final AreaService _service = widget.service ?? AreaService();
   late Future<List<Area>> _areas = _service.fetchAreas();
+  final TextEditingController _searchController = TextEditingController();
   String _search = '';
   Timer? _searchDebounce;
 
@@ -44,6 +47,7 @@ class _AreasScreenState extends State<AreasScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -82,12 +86,33 @@ class _AreasScreenState extends State<AreasScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
               child: TextField(
+                controller: _searchController,
                 style: const TextStyle(color: Colors.white),
+                cursorColor: const Color(0xFFFFBF00),
                 decoration: InputDecoration(
                   prefixIcon: const Icon(
                     Icons.search_rounded,
                     color: Color(0xFFFFBF00),
                   ),
+                  suffixIcon: _search.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(
+                            Icons.close_rounded,
+                            color: Color(0xFFFFBF00),
+                            size: 20,
+                          ),
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            _searchDebounce?.cancel();
+                            _searchController.clear();
+
+                            setState(() {
+                              _search = '';
+                              _areas = _service.fetchAreas();
+                            });
+                          },
+                        ),
                   hintText: 'Search areas...',
                   hintStyle: const TextStyle(
                     color: Color(0xFF9CA3AF),
@@ -207,9 +232,36 @@ class _AreasScreenState extends State<AreasScreen> {
                     itemCount: areas.length,
                     itemBuilder: (context, i) {
                       final area = areas[i];
-                      final hasPowerOut = !context
-                          .watch<PowerInterruptionProvider>()
-                          .hasPowerInArea(area.id);
+                      final provider = context
+                          .watch<PowerInterruptionProvider>();
+
+                      final activeInterruption = provider
+                          .interruptionsForArea(area.id)
+                          .where((item) {
+                            final status = item.status.trim().toLowerCase();
+
+                            if (status != 'ongoing') return false;
+
+                            final start = advisoryStart(item);
+                            final end = advisoryEnd(item);
+                            final now = DateTime.now().toUtc();
+
+                            if (start == null || end == null) return false;
+
+                            return !now.isBefore(start.toUtc()) &&
+                                now.isBefore(end.toUtc());
+                          })
+                          .firstOrNull;
+
+                      final hasPowerOut = activeInterruption != null;
+
+                      final outageStart = activeInterruption == null
+                          ? null
+                          : advisoryStart(activeInterruption);
+
+                      final outageStartLabel = outageStart == null
+                          ? null
+                          : DateFormat('h:mm a').format(outageStart);
 
                       return Container(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -267,12 +319,12 @@ class _AreasScreenState extends State<AreasScreen> {
                                           ),
                                           decoration: BoxDecoration(
                                             color: hasPowerOut
-                                              ? const Color(0xFF35191D)
-                                              : const Color(0xFF14271E),
+                                                ? const Color(0xFF35191D)
+                                                : const Color(0xFF14271E),
                                             border: Border.all(
                                               color: hasPowerOut
-                                                ? const Color(0xFFA9444D)
-                                                : const Color(0xFF347653),
+                                                  ? const Color(0xFFA9444D)
+                                                  : const Color(0xFF347653),
                                             ),
                                             borderRadius: BorderRadius.circular(
                                               30,
@@ -298,8 +350,8 @@ class _AreasScreenState extends State<AreasScreen> {
                                                     : 'Power On',
                                                 style: TextStyle(
                                                   color: hasPowerOut
-                                                    ? const Color(0xFFFFD6D9)
-                                                    : const Color(0xFF86EFAC),
+                                                      ? const Color(0xFFFFD6D9)
+                                                      : const Color(0xFF86EFAC),
                                                   fontSize: 11,
                                                   fontWeight: FontWeight.w500,
                                                 ),
@@ -309,9 +361,9 @@ class _AreasScreenState extends State<AreasScreen> {
                                         ),
                                         if (hasPowerOut) ...[
                                           const SizedBox(width: 10),
-                                          const Text(
-                                            'Since 2:30 PM',
-                                            style: TextStyle(
+                                          Text(
+                                            'Since $outageStartLabel',
+                                            style: const TextStyle(
                                               color: Color(0xFFFCA5A5),
                                               fontSize: 11,
                                             ),

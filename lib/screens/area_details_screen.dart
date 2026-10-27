@@ -6,6 +6,8 @@ import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/widgets/power_status_widget.dart';
 import 'package:suga/widgets/weather_card.dart';
 import 'package:suga/widgets/upcoming_advisories_widget.dart';
+import 'package:suga/utils/advisory_time.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 class AreaDetailsScreen extends StatefulWidget {
   const AreaDetailsScreen({super.key, this.service});
@@ -103,9 +105,9 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
               }
 
               final provider = context.watch<PowerInterruptionProvider>();
-final isFavorite = provider.savedAreaIds.contains(
-  snapshot.data!.id,
-);
+              final isFavorite = provider.savedAreaIds.contains(
+                snapshot.data!.id,
+              );
 
               return IconButton(
                 onPressed: () => _toggleFavorite(snapshot.data!),
@@ -114,7 +116,9 @@ final isFavorite = provider.savedAreaIds.contains(
                   color: Color(0xFFFFBF00),
                   size: 26,
                 ),
-                tooltip: isFavorite ? 'Remove from favorites' : 'Add to favorites',
+                tooltip: isFavorite
+                    ? 'Remove from favorites'
+                    : 'Add to favorites',
               );
             },
           ),
@@ -138,7 +142,11 @@ final isFavorite = provider.savedAreaIds.contains(
 
               const SizedBox(height: 24),
 
-              const WeatherCard(),
+              WeatherCard(
+                latitude: area.latitude,
+                longitude: area.longitude,
+                locationName: area.name,
+              ),
 
               const SizedBox(height: 24),
 
@@ -160,62 +168,107 @@ final isFavorite = provider.savedAreaIds.contains(
                 ),
 
               for (final feeder in area.feeders)
-                Container(
-                  margin: const EdgeInsets.only(bottom: 10),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 16,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF111720),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF292F38)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 8,
-                        height: 8,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF4ADE80),
-                          shape: BoxShape.circle,
-                        ),
+                Builder(
+                  builder: (context) {
+                    final interruptions = context
+                        .watch<PowerInterruptionProvider>()
+                        .allInterruptions;
+
+                    final currentTime = tz.TZDateTime.now(manila);
+
+                    final isUnavailable = interruptions.any((item) {
+                      final status = item.status.trim().toLowerCase();
+
+                      if (status == 'cancelled' ||
+                          status == 'canceled' ||
+                          status == 'completed') {
+                        return false;
+                      }
+
+                      final affectsFeeder = item.feederIds.isNotEmpty
+                          ? item.feederIds.contains(feeder.id)
+                          : item.areaIds.contains(area.id);
+
+                      if (!affectsFeeder) return false;
+
+                      final start = advisoryStart(item);
+                      final end = advisoryEnd(item);
+
+                      if (start == null || end == null) return false;
+
+                      return !currentTime.isBefore(start) &&
+                          currentTime.isBefore(end);
+                    });
+
+                    final statusColor = isUnavailable
+                        ? const Color(0xFFF87171)
+                        : const Color(0xFF86EFAC);
+
+                    final statusBackground = isUnavailable
+                        ? const Color(0xFF35191C)
+                        : const Color(0xFF14271E);
+
+                    final statusBorder = isUnavailable
+                        ? const Color(0xFF8B343B)
+                        : const Color(0xFF347653);
+
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 16,
                       ),
-
-                      const SizedBox(width: 12),
-
-                      Expanded(
-                        child: Text(
-                          feeder.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111720),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFF292F38)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              color: isUnavailable
+                                  ? const Color(0xFFF87171)
+                                  : const Color(0xFF4ADE80),
+                              shape: BoxShape.circle,
+                            ),
                           ),
-                        ),
-                      ),
-
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 5,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF14271E),
-                          border: Border.all(color: const Color(0xFF347653)),
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: const Text(
-                          'Operational',
-                          style: TextStyle(
-                            color: Color(0xFF86EFAC),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              feeder.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: statusBackground,
+                              border: Border.all(color: statusBorder),
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: Text(
+                              isUnavailable ? 'Unavailable' : 'Operational',
+                              style: TextStyle(
+                                color: statusColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
 
               const SizedBox(height: 24),

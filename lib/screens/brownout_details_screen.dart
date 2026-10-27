@@ -8,6 +8,9 @@ import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/utils/advisory_time.dart';
 import 'package:suga/widgets/admin_advisory_actions.dart';
 import 'package:suga/widgets/weather_card.dart';
+import 'package:suga/routes/app_routes.dart';
+import 'package:suga/models/area.dart';
+import 'package:suga/services/area_service.dart';
 
 class BrownoutDetailsScreen extends StatelessWidget {
   const BrownoutDetailsScreen({super.key});
@@ -18,13 +21,15 @@ class BrownoutDetailsScreen extends StatelessWidget {
         ModalRoute.of(context)?.settings.arguments as PowerInterruption;
     // Use the provider's copy, so a change made by an admin shows right away.
     final brownout =
-        context.watch<PowerInterruptionProvider>().findById(passed.id) ?? passed;
+        context.watch<PowerInterruptionProvider>().findById(passed.id) ??
+        passed;
     final isAdmin = context.watch<AuthProvider>().isSignedIn;
     final notifications = context.watch<NotificationProvider>();
     final hasReminder = notifications.hasReminder(brownout);
     // Reminders are only for brownouts that are still coming up.
     final start = advisoryStart(brownout);
-    final canRemind = brownout.status.toLowerCase() == 'scheduled' &&
+    final canRemind =
+        brownout.status.toLowerCase() == 'scheduled' &&
         start != null &&
         start.isAfter(DateTime.now());
     final status = brownout.status.toLowerCase();
@@ -124,7 +129,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: Column(
@@ -159,29 +164,75 @@ class BrownoutDetailsScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 6,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.35),
-                    ),
-                  ),
 
-                  child: Text(
-                    brownout.status[0].toUpperCase() +
-                        brownout.status.substring(1).toLowerCase(),
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                if (isAdmin)
+                  InkWell(
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        AppRoutes.brownoutForm,
+                        arguments: brownout,
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFBF00).withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(
+                            0xFFFFBF00,
+                          ).withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.edit_outlined,
+                            size: 14,
+                            color: Color(0xFFFFBF00),
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            'Edit',
+                            style: TextStyle(
+                              color: Color(0xFFFFBF00),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: statusColor.withValues(alpha: 0.35),
+                      ),
+                    ),
+                    child: Text(
+                      brownout.status[0].toUpperCase() +
+                          brownout.status.substring(1).toLowerCase(),
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
 
@@ -287,7 +338,65 @@ class BrownoutDetailsScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Weather Card
-            const WeatherCard(),
+            FutureBuilder<List<Area>>(
+              future: AreaService().fetchAreas(),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return const Text(
+                    'Unable to load weather for this area.',
+                    style: TextStyle(color: Color(0xFF9CA3AF)),
+                  );
+                }
+
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: Color(0xFFFFBF00)),
+                  );
+                }
+
+                if (!snapshot.hasData) {
+                  return const Text(
+                    'Weather area information is unavailable.',
+                    style: TextStyle(color: Color(0xFF9CA3AF)),
+                  );
+                }
+
+                // Use the first affected area that matches an area from the API.
+                final affectedAreaNames = brownout.affectedAreas
+                    .map((name) => name.trim().toLowerCase())
+                    .toSet();
+
+                final matchingAreas = snapshot.data!.where(
+                  (area) => affectedAreaNames.contains(
+                    area.name.trim().toLowerCase(),
+                  ),
+                );
+
+                if (start == null) {
+                  return const Text(
+                    'Weather unavailable: scheduled start time could not be determined.',
+                    style: TextStyle(color: Color(0xFF9CA3AF)),
+                  );
+                }
+
+                if (matchingAreas.isEmpty) {
+                  return Text(
+                    'Weather unavailable: no matching area found for '
+                    '${brownout.affectedAreas.join(', ')}.',
+                    style: const TextStyle(color: Color(0xFF9CA3AF)),
+                  );
+                }
+
+                final affectedArea = matchingAreas.first;
+
+                return WeatherCard(
+                  latitude: affectedArea.latitude,
+                  longitude: affectedArea.longitude,
+                  locationName: affectedArea.name,
+                  forecastDateTime: start,
+                );
+              },
+            ),
 
             const SizedBox(height: 16),
 
@@ -300,11 +409,15 @@ class BrownoutDetailsScreen extends StatelessWidget {
                     : () async {
                         final messenger = ScaffoldMessenger.of(context);
                         final willFire = await notifications.remindMe(brownout);
-                        messenger.showSnackBar(SnackBar(
-                          content: Text(willFire
-                              ? "We'll remind you ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} before it starts."
-                              : 'Saved to your alerts. Allow notifications to get a phone reminder.'),
-                        ));
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              willFire
+                                  ? "We'll remind you ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} before it starts."
+                                  : 'Saved to your alerts. Allow notifications to get a phone reminder.',
+                            ),
+                          ),
+                        );
                       },
                 icon: Icon(
                   hasReminder
@@ -316,8 +429,8 @@ class BrownoutDetailsScreen extends StatelessWidget {
                   !canRemind
                       ? 'No Reminder for This Advisory'
                       : hasReminder
-                          ? 'Reminder Set · ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} Before'
-                          : 'Notify Me Before Interruption',
+                      ? 'Reminder Set · ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} Before'
+                      : 'Notify Me Before Interruption',
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFBF00),

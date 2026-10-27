@@ -9,10 +9,7 @@ import 'package:suga/widgets/weather_card.dart';
 import 'package:suga/widgets/upcoming_advisories_widget.dart';
 
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({
-    super.key,
-    this.onNavigateToAreas,
-  });
+  const HomeScreen({super.key, this.onNavigateToAreas});
 
   final VoidCallback? onNavigateToAreas;
 
@@ -255,17 +252,59 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 24),
 
               const PowerStatusWidget(),
-              
+
               const SizedBox(height: 24),
 
-              const WeatherCard(),
-              
+              Consumer<PowerInterruptionProvider>(
+                builder: (context, provider, child) {
+                  final selectedAreaId = provider.selectedAreaId;
+
+                  if (selectedAreaId == null) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return FutureBuilder<List<Area>>(
+                    future: AreaService().fetchAreas(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasError) {
+                        return const Text(
+                          'Unable to load area weather.',
+                          style: TextStyle(color: Color(0xFF9CA3AF)),
+                        );
+                      }
+
+                      if (!snapshot.hasData) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final areas = snapshot.data!;
+                      final matchingAreas = areas.where(
+                        (area) => area.id == selectedAreaId,
+                      );
+
+                      if (matchingAreas.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      final selectedArea = matchingAreas.first;
+
+                      return WeatherCard(
+                        latitude: selectedArea.latitude,
+                        longitude: selectedArea.longitude,
+                        locationName: selectedArea.name,
+                      );
+                    },
+                  );
+                },
+              ),
+
               const SizedBox(height: 28),
 
               UpcomingAdvisoriesWidget(
-                areaId: context.watch<PowerInterruptionProvider>().selectedAreaId,
-              )
-
+                areaId: context
+                    .watch<PowerInterruptionProvider>()
+                    .selectedAreaId,
+              ),
             ],
           ),
         ),

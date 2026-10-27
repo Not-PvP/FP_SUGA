@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:provider/provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
+import 'package:suga/utils/advisory_time.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 class PowerStatusWidget extends StatefulWidget {
   const PowerStatusWidget({super.key, this.areaId});
@@ -54,7 +56,32 @@ class _PowerStatusWidgetState extends State<PowerStatusWidget>
           return const SizedBox.shrink();
         }
 
-        final hasPower = provider.hasPowerInArea(displayAreaId);
+        final now = manila;
+        final currentTime = tz.TZDateTime.now(now);
+
+        final currentAdvisories = provider
+            .interruptionsForArea(displayAreaId)
+            .where((item) {
+              final status = item.status.trim().toLowerCase();
+
+              if (status != 'ongoing') {
+                return false;
+              }
+
+              final start = advisoryStart(item);
+              final end = advisoryEnd(item);
+
+              if (start == null || end == null) return false;
+
+              return !currentTime.isBefore(start) && currentTime.isBefore(end);
+            })
+            .toList();
+
+        final outage = currentAdvisories.isEmpty
+            ? null
+            : currentAdvisories.first;
+
+        final hasPower = outage == null;
         if (hasPower && !_glowController.isAnimating) {
           _glowController.repeat(reverse: true);
         } else if (!hasPower && _glowController.isAnimating) {
@@ -144,7 +171,8 @@ class _PowerStatusWidgetState extends State<PowerStatusWidget>
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      'As of ${DateTime.now().month}/${DateTime.now().day}/${DateTime.now().year} • ${TimeOfDay.fromDateTime(DateTime.now()).format(context)}',
+                      'As of ${currentTime.month}/${currentTime.day}/${currentTime.year} • '
+                      '${_formatAdvisoryTime('${currentTime.hour}:${currentTime.minute.toString().padLeft(2, '0')}', context)}',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 13,
@@ -164,16 +192,22 @@ class _PowerStatusWidgetState extends State<PowerStatusWidget>
                           size: 16,
                         ),
                         const SizedBox(width: 6),
-                        const Text(
-                          'Since [outage start time]',
-                          style: TextStyle(color: Colors.white70, fontSize: 13),
+                        Text(
+                          'Since ${_formatAdvisoryTime('${advisoryStart(outage)!.hour}:${advisoryStart(outage)!.minute.toString().padLeft(2, '0')}', context)}',
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    const Text(
-                      'Est. restoration: [estimated time]',
-                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    Text(
+                      'Est. restoration: ${_formatAdvisoryTime((outage.estimatedRestorationTime?.trim().isNotEmpty == true) ? outage.estimatedRestorationTime!.trim() : outage.endTime, context)}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                      ),
                     ),
                   ],
                 ),
@@ -183,4 +217,18 @@ class _PowerStatusWidgetState extends State<PowerStatusWidget>
       },
     );
   }
+}
+
+String _formatAdvisoryTime(String? time, BuildContext context) {
+  if (time == null || time.trim().isEmpty) return '—';
+
+  final parts = time.trim().split(':');
+  if (parts.length < 2) return time;
+
+  final hour = int.tryParse(parts[0]);
+  final minute = int.tryParse(parts[1]);
+
+  if (hour == null || minute == null) return time;
+
+  return TimeOfDay(hour: hour, minute: minute).format(context);
 }
