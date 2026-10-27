@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:collection';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:suga/models/power_interruption.dart';
 import 'package:suga/services/interruption_service.dart';
+import 'package:suga/utils/advisory_time.dart';
 
 // Shared power interruption state for every screen.
 // Screens read it with context.watch<PowerInterruptionProvider>() and call its
@@ -24,6 +27,11 @@ class PowerInterruptionProvider extends ChangeNotifier {
   Map<String, String> _fieldErrors = const {};
   Future<void>? _pendingLoad;
   bool _disposed = false;
+  DateTime? _lastUpdated;
+  bool _areasRestored = true;
+
+  static const _kHomeArea = 'areas.homeId';
+  static const _kSavedAreas = 'areas.savedIds';
 
   // Every interruption, soonest first.
   UnmodifiableListView<PowerInterruption> get allInterruptions =>
@@ -40,6 +48,12 @@ class PowerInterruptionProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   bool get isSaving => _isSaving;
   bool get hasLoaded => _hasLoaded;
+
+  // When the advisories last loaded successfully. Shown as "Updated 2:14 PM".
+  DateTime? get lastUpdated => _lastUpdated;
+
+  // False while the saved home area is being read at startup.
+  bool get areasRestored => _areasRestored;
 
   // Why the last load failed. The list keeps the last data that loaded successfully.
   String? get error => _error;
@@ -60,39 +74,41 @@ class PowerInterruptionProvider extends ChangeNotifier {
   List<PowerInterruption> interruptionsForArea(int areaId) =>
       _all.where((item) => item.areaIds.contains(areaId)).toList();
 
-  bool hasPowerInArea(int areaId) {
-    final now = DateTime.now();
-
-    return !interruptionsForArea(areaId).any((item) {
-      if (item.status.toLowerCase() != 'active') return false;
-
-      final date = DateTime.tryParse(item.date);
-      final start = item.startTime.split(':');
-      final end = item.endTime.split(':');
-
-      if (date == null || start.length < 2 || end.length < 2) {
-        return false;
-      }
-
-      final startTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        int.tryParse(start[0]) ?? 0,
-        int.tryParse(start[1]) ?? 0,
-      );
-
-      final endTime = DateTime(
-        date.year,
-        date.month,
-        date.day,
-        int.tryParse(end[0]) ?? 0,
-        int.tryParse(end[1]) ?? 0,
-      );
-
-      return !now.isBefore(startTime) && now.isBefore(endTime);
-    });
+  // A brownout is happening now when an admin marked it ongoing, or when a
+  // scheduled one has reached its start time and not yet ended.
+  static bool isOutageNow(PowerInterruption item, DateTime now) {
+    final status = item.status.toLowerCase();
+    if (status == 'ongoing') return true;
+    if (status != 'scheduled') return false;
+    final start = advisoryStart(item);
+    var end = advisoryEnd(item);
+    if (start == null || end == null) return false;
+    // An end time earlier than the start means it runs past midnight.
+    if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
+    return !now.isBefore(start) && now.isBefore(end);
   }
+
+  // The brownout happening in this area right now, if any.
+  PowerInterruption? currentOutage(int areaId) {
+    final now = DateTime.now();
+    for (final item in interruptionsForArea(areaId)) {
+      if (isOutageNow(item, now)) return item;
+    }
+    return null;
+  }
+
+  // The next scheduled brownout in this area that has not started yet.
+  PowerInterruption? nextOutage(int areaId) {
+    final now = DateTime.now();
+    for (final item in interruptionsForArea(areaId)) {
+      if (item.status.toLowerCase() != 'scheduled') continue;
+      final start = advisoryStart(item);
+      if (start != null && start.isAfter(now)) return item;
+    }
+    return null;
+  }
+
+  bool hasPowerInArea(int areaId) => currentOutage(areaId) == null;
 
   PowerInterruption? findById(String id) {
     for (final item in _all) {
@@ -101,7 +117,7 @@ class PowerInterruptionProvider extends ChangeNotifier {
     return null;
   }
 
-  // Shows only one area's interruptions in [interruptions]. Pass null to show all.
+  // Sets the home area (also saving it). Pass null to show every area.
   void setAreaFilter(int? areaId) {
     bool changed = false;
 
@@ -114,7 +130,7 @@ class PowerInterruptionProvider extends ChangeNotifier {
       changed = true;
     }
 
-    if (changed) _notify();
+    if (changed) _areasChanged();
   }
 
   void setMainArea(int areaId) {
@@ -122,22 +138,22 @@ class PowerInterruptionProvider extends ChangeNotifier {
 
     if (_selectedAreaId != areaId) {
       _selectedAreaId = areaId;
-      _notify();
+      _areasChanged();
     }
   }
 
   void removeSavedArea(int areaId) {
-    // Prevent removing the current main area.
+    // Prevent removing the current home area.
     if (_selectedAreaId == areaId) return;
 
     if (_savedAreaIds.remove(areaId)) {
-      _notify();
+      _areasChanged();
     }
   }
 
   void toggleSavedArea(int areaId) {
     if (_savedAreaIds.contains(areaId)) {
-      // Keep the main area saved.
+      // Keep the home area saved.
       if (_selectedAreaId == areaId) return;
 
       _savedAreaIds.remove(areaId);
@@ -145,7 +161,47 @@ class PowerInterruptionProvider extends ChangeNotifier {
       _savedAreaIds.add(areaId);
     }
 
+    _areasChanged();
+  }
+
+  // Reads the home and saved areas kept on the phone. main.dart calls it once at
+  // startup, so people do not have to pick their area again every launch.
+  Future<void> restoreAreas() async {
+    _areasRestored = false;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final home = prefs.getInt(_kHomeArea);
+      final saved = prefs.getStringList(_kSavedAreas) ?? const [];
+      // A choice made while this was loading wins over the stored one.
+      _selectedAreaId ??= home;
+      _savedAreaIds.addAll(saved.map(int.tryParse).nonNulls);
+      final selected = _selectedAreaId;
+      if (selected != null) _savedAreaIds.add(selected);
+    } catch (_) {
+      // Nothing stored or storage unavailable: start without an area.
+    }
+    _areasRestored = true;
     _notify();
+  }
+
+  void _areasChanged() {
+    _notify();
+    unawaited(_storeAreas());
+  }
+
+  Future<void> _storeAreas() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final home = _selectedAreaId;
+      if (home == null) {
+        await prefs.remove(_kHomeArea);
+      } else {
+        await prefs.setInt(_kHomeArea, home);
+      }
+      await prefs.setStringList(_kSavedAreas, [for (final id in _savedAreaIds) '$id']);
+    } catch (_) {
+      // Not saved; the choice still applies until the app closes.
+    }
   }
 
   void clearActionError() {
@@ -167,6 +223,7 @@ class PowerInterruptionProvider extends ChangeNotifier {
     try {
       _all = _sorted(await _service.fetchInterruptions());
       _hasLoaded = true;
+      _lastUpdated = DateTime.now();
     } on ApiException catch (e) {
       _error = e.message;
     } finally {

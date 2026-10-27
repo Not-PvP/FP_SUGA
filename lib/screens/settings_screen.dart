@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:suga/models/area.dart';
-import 'package:suga/services/area_service.dart';
 import 'package:provider/provider.dart';
-import 'package:suga/providers/power_interruption_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:suga/models/area.dart';
 import 'package:suga/providers/auth_provider.dart';
 import 'package:suga/providers/notification_provider.dart';
+import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/routes/app_routes.dart';
+import 'package:suga/services/area_service.dart';
+import 'package:suga/theme/app_theme.dart';
+import 'package:suga/widgets/ui.dart';
+import 'package:url_launcher/url_launcher.dart';
 
+// Settings tab: saved areas, alert preferences, admin sign-in and app info.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key, this.onNavigateToAreas});
 
@@ -18,965 +21,436 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late Future<List<Area>> _areasFuture;
-  // Push, lead time and power restored settings live in NotificationProvider,
-  // so they are saved and used to schedule reminders.
-  bool _weatherAlerts = false;
+  final _areaService = AreaService();
+  late Future<List<Area>> _areasFuture = _areaService.fetchAreas();
 
-  Widget _buildNotificationsSection() {
+  void _retryAreas() => setState(() => _areasFuture = _areaService.fetchAreas());
 
-    const cardColor = Color(0xFF111720);
-    const borderColor = Color(0xFF292F38);
-    const secondaryText = Color(0xFF9CA3AF);
-
-    Widget settingDivider() => const Divider(color: borderColor, height: 1);
-
-    // Rebuilds when a notification setting changes.
-    return Consumer<NotificationProvider>(
-      builder: (context, notifications, _) {
-        final pushEnabled = notifications.pushEnabled;
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(0, 12, 0, 12),
-              child: Text(
-                'NOTIFICATIONS',
-                style: TextStyle(
-                  color: secondaryText,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-
-            Container(
-              margin: const EdgeInsets.fromLTRB(0, 0, 0, 24),
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: borderColor),
-              ),
-              child: Column(
-                children: [
-                  // Master push notification toggle
-                  _buildAlertToggle(
-                    title: 'Push Notifications',
-                    subtitle: 'Still receive alerts from SUGA',
-                    value: pushEnabled,
-                    enabled: true,
-                    onChanged: notifications.setPushEnabled,
-                  ),
-                  settingDivider(),
-
-                  // Alert reminder timing
-                  Opacity(
-                    opacity: pushEnabled ? 1 : 0.45,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      child: Row(
-                        children: [
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Alert me before',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'Upcoming scheduled brownouts',
-                                  style: TextStyle(
-                                    color: Color(0xFF9CA3AF),
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            height: 48,
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF070A0F),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFF292F38)),
-                            ),
-                            child: DropdownButton<int>(
-                              value: notifications.leadMinutes,
-                              isDense: false,
-                              underline: const SizedBox.shrink(),
-                              dropdownColor: const Color(0xFF111720),
-                              icon: const Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: Color(0xFFFFBF00),
-                              ),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                              ),
-                              items: [
-                                for (final minutes in NotificationProvider.leadTimeOptions)
-                                  DropdownMenuItem(
-                                    value: minutes,
-                                    child: Text(NotificationProvider.leadTimeLabel(minutes)),
-                                  ),
-                              ],
-                              onChanged: !pushEnabled
-                                  ? null
-                                  : (value) {
-                                      if (value == null) return;
-                                      notifications.setLeadMinutes(value);
-                                    },
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  settingDivider(),
-
-                  // Power restoration alerts
-                  _buildAlertToggle(
-                    title: 'Power Restored Alerts',
-                    subtitle: 'Know when electricity returns',
-                    value: notifications.restoredAlerts,
-                    enabled: pushEnabled,
-                    onChanged: notifications.setRestoredAlerts,
-                  ),
-
-                  settingDivider(),
-
-                  // Weather alerts
-                  _buildAlertToggle(
-                    title: 'Weather Alerts',
-                    subtitle: 'Get notified about severe weather',
-                    value: _weatherAlerts,
-                    enabled: pushEnabled,
-                    onChanged: (value) {
-                      setState(() {
-                        _weatherAlerts = value;
-                      });
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
+  void _browseAreas() {
+    final open = widget.onNavigateToAreas;
+    if (open != null) {
+      open();
+    } else {
+      Navigator.pushNamed(context, AppRoutes.areas);
+    }
   }
 
-  Widget _buildAdminSection() {
-    const amber = Color(0xFFFFBF00);
-    const danger = Color(0xFFF87171);
-    const cardColor = Color(0xFF111720);
-    const borderColor = Color(0xFF292F38);
-    const secondaryText = Color(0xFF9CA3AF);
-
-    // Rebuilds when the admin signs in or out, or the session expires.
-    return Consumer<AuthProvider>(
-      builder: (context, auth, _) {
-        final admin = auth.admin;
-        final signedIn = admin != null;
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(0, 12, 0, 12),
-              child: Text(
-                'ADMIN',
-                style: TextStyle(
-                  color: secondaryText,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-            Container(
-              margin: const EdgeInsets.only(bottom: 24),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardColor,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: signedIn ? amber.withValues(alpha: 0.5) : borderColor,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF292315),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Icon(
-                          signedIn
-                              ? Icons.verified_user_outlined
-                              : Icons.admin_panel_settings_outlined,
-                          color: amber,
-                          size: 26,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              signedIn ? 'Signed in as admin' : 'Admin Login',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              signedIn
-                                  ? admin.email
-                                  : 'Manage advisories and feeder information',
-                              style: const TextStyle(
-                                color: secondaryText,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (signedIn) ...[
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Admin tools are shown on Scheduled Brownouts and on each advisory.',
-                      style: TextStyle(color: Color(0xFFD1D5DB), fontSize: 12),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 48,
-                    child: signedIn
-                        ? OutlinedButton.icon(
-                            onPressed: () async {
-                              final messenger = ScaffoldMessenger.of(context);
-                              await context.read<AuthProvider>().logout();
-                              messenger.showSnackBar(
-                                const SnackBar(
-                                  content: Text('Signed out. Admin tools are hidden.'),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.logout_rounded, size: 18),
-                            label: const Text('Sign Out'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: danger,
-                              side: BorderSide(color: danger.withValues(alpha: 0.5)),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          )
-                        : ElevatedButton.icon(
-                            onPressed: () =>
-                                Navigator.pushNamed(context, AppRoutes.adminLogin),
-                            icon: const Icon(Icons.login_rounded, size: 18),
-                            label: const Text('Open Admin Portal'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: amber,
-                              foregroundColor: const Color(0xFF070A0F),
-                              elevation: 0,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              textStyle: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        );
-      },
-    );
+  Future<void> _openGitHub() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final opened = await launchUrl(Uri.https('github.com', '/Not-PvP/FP_SUGA'))
+        .catchError((_) => false);
+    if (!opened) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text("Couldn't open GitHub. Visit github.com/Not-PvP/FP_SUGA.")),
+      );
+    }
   }
 
-  Widget _buildAboutSection() {
-    const amber = Color(0xFFFFBF00);
-    const cardColor = Color(0xFF111720);
-    const borderColor = Color(0xFF292F38);
-    const secondaryText = Color(0xFF9CA3AF);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Padding(
-          padding: EdgeInsets.fromLTRB(0, 12, 0, 12),
-          child: Text(
-            'ABOUT',
-            style: TextStyle(
-              color: secondaryText,
-              fontSize: 11,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 1.5,
-            ),
-          ),
-        ),
-        Container(
-          margin: const EdgeInsets.only(bottom: 24),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: cardColor,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'SUGA',
-                          style: TextStyle(
-                            color: amber,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 1,
-                          ),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          'Brownout Tracker',
-                          style: TextStyle(color: secondaryText, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 7,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF292315),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: amber.withValues(alpha: 0.4)),
-                    ),
-                    child: const Text(
-                      'v1.0.0',
-                      style: TextStyle(
-                        color: amber,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Divider(color: borderColor, height: 1),
-              const SizedBox(height: 16),
-              const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.verified_outlined, color: amber, size: 20),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'DATA',
-                          style: TextStyle(
-                            color: secondaryText,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        SizedBox(height: 5),
-                        Text(
-                          'Verified by official advisories',
-                          style: TextStyle(color: Colors.white, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(Icons.code_rounded, color: amber, size: 20),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'MADE BY',
-                          style: TextStyle(
-                            color: secondaryText,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                        SizedBox(height: 5),
-                        Text(
-                          'Florencio and Olmo',
-                          style: TextStyle(color: Colors.white, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Divider(color: borderColor, height: 1),
-              const SizedBox(height: 8),
-              InkWell(
-                onTap: () async {
-                  final uri = Uri.https('github.com', '/Not-PvP/FP_SUGA');
-
-                  try {
-                    final opened = await launchUrl(
-                      uri,
-                      mode: LaunchMode.platformDefault,
-                    );
-
-                    if (!opened && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
-                            'Unable to open GitHub. Please try again.',
-                          ),
-                        ),
-                      );
-                    }
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Could not open GitHub: $e')),
-                      );
-                    }
-                  }
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 10),
-                  child: Row(
-                    children: [
-                      Icon(Icons.code_rounded, color: amber, size: 22),
-                      SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'GitHub Repository',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              'View the SUGA source code',
-                              style: TextStyle(
-                                color: Color(0xFF9CA3AF),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.open_in_new_rounded,
-                        color: secondaryText,
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildAlertToggle({
-    required String title,
-    required String subtitle,
-    required bool value,
-    required bool enabled,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return Opacity(
-      opacity: enabled ? 1 : 0.45,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Row(
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: Navigator.canPop(context) ? AppBar() : null,
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 12),
-                  ),
-                ],
-              ),
+            const ScreenHeader(
+              title: 'Settings',
+              subtitle: 'Your areas, alerts, and app info.',
+              padding: EdgeInsets.fromLTRB(0, 20, 0, 20),
             ),
-            Switch(
-              value: value,
-              activeTrackColor: const Color(0xFFFFBF00),
-              inactiveTrackColor: const Color(0xFF374151),
-              onChanged: enabled ? onChanged : null,
-            ),
+            const SectionLabel('Saved areas'),
+            _buildSavedAreas(),
+            const SizedBox(height: 32),
+            const SectionLabel('Alerts'),
+            _buildAlerts(),
+            const SizedBox(height: 32),
+            const SectionLabel('Admin'),
+            _buildAdmin(),
+            const SizedBox(height: 32),
+            const SectionLabel('About'),
+            _buildAbout(),
           ],
         ),
       ),
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _areasFuture = AreaService().fetchAreas();
+  // Saved areas -------------------------------------------------------------
+
+  Widget _buildSavedAreas() {
+    return FutureBuilder<List<Area>>(
+      future: _areasFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          return StatePanel(
+            icon: Icons.cloud_off_rounded,
+            title: "Couldn't load your areas",
+            message: '${snapshot.error}',
+            actionLabel: 'Retry',
+            onAction: _retryAreas,
+          );
+        }
+
+        final provider = context.watch<PowerInterruptionProvider>();
+        final homeId = provider.selectedAreaId;
+        final saved = snapshot.data!
+            .where((area) => provider.savedAreaIds.contains(area.id))
+            .toList()
+          ..sort((a, b) => a.id == homeId ? -1 : (b.id == homeId ? 1 : 0));
+
+        return Column(
+          children: [
+            for (final area in saved) ...[
+              _SavedAreaTile(area: area, isHome: area.id == homeId),
+              const SizedBox(height: 10),
+            ],
+            _AddAreaTile(firstArea: saved.isEmpty, onTap: _browseAreas),
+          ],
+        );
+      },
+    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF070A0F),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Settings',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    'Customize your SUGA Experience.',
-                    style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-                  ),
-                ],
+  // Alerts ------------------------------------------------------------------
+
+  Widget _buildAlerts() {
+    return Consumer<NotificationProvider>(
+      builder: (context, notifications, _) {
+        final pushEnabled = notifications.pushEnabled;
+        return SugaCard(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Column(
+            children: [
+              _toggle(
+                title: 'Phone alerts',
+                subtitle: 'Reminders and updates for your saved areas',
+                value: pushEnabled,
+                onChanged: notifications.setPushEnabled,
               ),
-            ),
-
-            // Saved areas
-            Expanded(
-              child: FutureBuilder<List<Area>>(
-                future: _areasFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: Color(0xFFFFBF00),
-                      ),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return const Center(
-                      child: Text(
-                        'Unable to load saved areas.',
-                        style: TextStyle(color: Color(0xFF9CA3AF)),
-                      ),
-                    );
-                  }
-
-                  final areas = snapshot.data ?? [];
-                  final savedAreaIds = context
-                      .watch<PowerInterruptionProvider>()
-                      .savedAreaIds;
-
-                  final savedAreas = areas
-                      .where((area) => savedAreaIds.contains(area.id))
-                      .toList();
-
-                  final mainAreaId = context
-                      .read<PowerInterruptionProvider>()
-                      .selectedAreaId;
-
-                  savedAreas.sort((a, b) {
-                    if (a.id == mainAreaId) return -1;
-                    if (b.id == mainAreaId) return 1;
-                    return 0;
-                  });
-
-                  return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-                    itemCount: savedAreas.length + 5,
-                    separatorBuilder: (_, _) => const SizedBox(height: 10),
-                    itemBuilder: (context, index) {
-                      if (index == 0) {
-                        return const Padding(
-                          padding: EdgeInsets.only(bottom: 2),
-                          child: Text(
-                            'MY AREAS',
-                            style: TextStyle(
-                              color: Color(0xFF9CA3AF),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 1.5,
-                            ),
-                          ),
-                        );
-                      }
-
-                      final areaIndex = index - 1;
-
-                      if (areaIndex == savedAreas.length) {
-                        return Padding(
-                          padding: const EdgeInsets.only(top: 4, bottom: 4),
-                          child: InkWell(
-                            onTap: widget.onNavigateToAreas,
-                            borderRadius: BorderRadius.circular(18),
-                            child: CustomPaint(
-                              painter: const _DashedBorderPainter(
-                                color: Color(0xFF4B5563),
-                                radius: 18,
-                              ),
-                              child: Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 20,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF0C1118),
-                                  borderRadius: BorderRadius.circular(18),
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      savedAreas.isEmpty
-                                          ? Icons.location_searching_rounded
-                                          : Icons.add_location_alt_outlined,
-                                      color: const Color(0xFFFFBF00),
-                                      size: 26,
-                                    ),
-                                    SizedBox(height: 8),
-                                    Text(
-                                      savedAreas.isEmpty
-                                          ? 'No saved areas yet'
-                                          : 'Add another area',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      savedAreas.isEmpty
-                                          ? 'Browse locations to get started'
-                                          : 'Browse and save more locations',
-                                      style: TextStyle(
-                                        color: Color(0xFF9CA3AF),
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }
-
-                      if (areaIndex == savedAreas.length + 1) {
-                        return _buildNotificationsSection();
-                      }
-
-                      if (areaIndex == savedAreas.length + 2) {
-                        return _buildAdminSection();
-                      }
-
-                      if (areaIndex == savedAreas.length + 3) {
-                        return _buildAboutSection();
-                      }
-
-                      final area = savedAreas[areaIndex];
-
-                      final provider = context
-                          .watch<PowerInterruptionProvider>();
-                      final isMain = provider.selectedAreaId == area.id;
-
-                      return Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF111720),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: isMain
-                                ? const Color(0xFFFFBF00).withValues(alpha: 0.5)
-                                : const Color(0xFF292F38),
-                          ),
-                        ),
+              const Divider(),
+              Opacity(
+                opacity: pushEnabled ? 1 : 0.45,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  width: 48,
-                                  height: 48,
-                                  decoration: BoxDecoration(
-                                    color: isMain
-                                        ? const Color(0xFF292315)
-                                        : const Color(0xFF1A2029),
-                                    borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(
-                                      color: isMain
-                                          ? const Color(
-                                              0xFFFFBF00,
-                                            ).withValues(alpha: 0.5)
-                                          : const Color(0xFF374151),
-                                    ),
-                                  ),
-                                  child: Icon(
-                                    Icons.location_on_outlined,
-                                    color: isMain
-                                        ? const Color(0xFFFFBF00)
-                                        : const Color(0xFF9CA3AF),
-                                    size: 26,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        area.name,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        area.city,
-                                        style: const TextStyle(
-                                          color: Color(0xFF9CA3AF),
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-
-                                if (isMain)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 9,
-                                      vertical: 5,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF292315),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: const Color(
-                                          0xFFFFBF00,
-                                        ).withValues(alpha: 0.4),
-                                      ),
-                                    ),
-                                    child: const Text(
-                                      'MAIN',
-                                      style: TextStyle(
-                                        color: Color(0xFFFFBF00),
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w700,
-                                        letterSpacing: 0.8,
-                                      ),
-                                    ),
-                                  )
-                                else ...[
-                                  const SizedBox(width: 4),
-                                  InkWell(
-                                    onTap: () {
-                                      context
-                                          .read<PowerInterruptionProvider>()
-                                          .setMainArea(area.id);
-                                    },
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF1F2937),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                          color: const Color(
-                                            0xFF374151,
-                                          ).withValues(alpha: 0.4),
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'Set as main',
-                                        style: TextStyle(
-                                          color: Color(0xFFD1D5DB),
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-
-                                  SizedBox(width: 4),
-
-                                  TextButton(
-                                    onPressed: () {
-                                      context
-                                          .read<PowerInterruptionProvider>()
-                                          .removeSavedArea(area.id);
-                                    },
-                                    style: TextButton.styleFrom(
-                                      foregroundColor: const Color(0xFFF87171),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 4,
-                                      ),
-                                      minimumSize: Size.zero,
-                                      tapTargetSize:
-                                          MaterialTapTargetSize.shrinkWrap,
-                                    ),
-                                    child: const Text(
-                                      'Remove',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-
-                            const SizedBox(height: 14),
-                            const Divider(color: Color(0xFF292F38), height: 1),
-                            const SizedBox(height: 12),
-
-                            Row(
-                              children: [
-                                const Icon(
-                                  Icons.notifications_active_outlined,
-                                  color: Color(0xFFFFBF00),
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 7),
-                                const Expanded(
-                                  child: Text(
-                                    'Notifications enabled',
-                                    style: TextStyle(
-                                      color: Color(0xFFD1D5DB),
-                                      fontSize: 12,
-                                    ),
-                                  ),
-                                ),
-                                TextButton(
-                                  onPressed: () {
-                                    //TODO
-                                  },
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: const Color(0xFFFFBF00),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 4,
-                                      vertical: 4,
-                                    ),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        'Customize',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      SizedBox(width: 4),
-                                      Icon(Icons.arrow_forward, size: 14),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+                            Text('Remind me before', style: AppText.cardTitle),
+                            SizedBox(height: 2),
+                            Text('Each scheduled brownout', style: AppText.small),
                           ],
                         ),
-                      );
-                    },
-                  );
-                },
+                      ),
+                      DropdownButton<int>(
+                        value: notifications.leadMinutes,
+                        underline: const SizedBox.shrink(),
+                        dropdownColor: AppColors.surfaceRaised,
+                        borderRadius: BorderRadius.circular(12),
+                        icon: const Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.amber),
+                        style: AppText.body.copyWith(color: AppColors.text),
+                        items: [
+                          for (final minutes in NotificationProvider.leadTimeOptions)
+                            DropdownMenuItem(
+                              value: minutes,
+                              child: Text(NotificationProvider.leadTimeLabel(minutes)),
+                            ),
+                        ],
+                        onChanged: !pushEnabled
+                            ? null
+                            : (value) {
+                                if (value != null) notifications.setLeadMinutes(value);
+                              },
+                      ),
+                    ],
+                  ),
+                ),
               ),
+              const Divider(),
+              _toggle(
+                title: 'Power restored',
+                subtitle: 'Tell me when electricity comes back',
+                value: notifications.restoredAlerts,
+                onChanged: pushEnabled ? notifications.setRestoredAlerts : null,
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _toggle({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool>? onChanged,
+  }) {
+    return Opacity(
+      opacity: onChanged == null ? 0.45 : 1,
+      child: SwitchListTile(
+        contentPadding: EdgeInsets.zero,
+        title: Text(title, style: AppText.cardTitle),
+        subtitle: Text(subtitle, style: AppText.small),
+        value: value,
+        onChanged: onChanged,
+      ),
+    );
+  }
+
+  // Admin -------------------------------------------------------------------
+
+  Widget _buildAdmin() {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        final admin = auth.admin;
+        final signedIn = admin != null;
+        return SugaCard(
+          borderColor: signedIn ? AppColors.amber.withValues(alpha: 0.5) : AppColors.line,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  IconTile(
+                    signedIn ? Icons.verified_user_outlined : Icons.admin_panel_settings_outlined,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(signedIn ? 'Signed in as admin' : 'Admin sign-in', style: AppText.cardTitle),
+                        const SizedBox(height: 2),
+                        Text(
+                          signedIn ? admin.email : 'For SUGA staff who post advisories',
+                          style: AppText.small,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (signedIn) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Admin tools appear on Scheduled brownouts and on each advisory.',
+                  style: AppText.muted,
+                ),
+              ],
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                child: signedIn
+                    ? OutlinedButton.icon(
+                        onPressed: () async {
+                          final messenger = ScaffoldMessenger.of(context);
+                          await context.read<AuthProvider>().logout();
+                          messenger.showSnackBar(
+                            const SnackBar(content: Text('Signed out. Admin tools are hidden.')),
+                          );
+                        },
+                        icon: const Icon(Icons.logout_rounded, size: 18),
+                        label: const Text('Sign out'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.outage,
+                          side: BorderSide(color: AppColors.outage.withValues(alpha: 0.5)),
+                        ),
+                      )
+                    : OutlinedButton.icon(
+                        onPressed: () => Navigator.pushNamed(context, AppRoutes.adminLogin),
+                        icon: const Icon(Icons.login_rounded, size: 18),
+                        label: const Text('Sign in as admin'),
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // About -------------------------------------------------------------------
+
+  Widget _buildAbout() {
+    return SugaCard(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+      child: Column(
+        children: [
+          const Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                'SUGA',
+                style: TextStyle(
+                  fontFamily: AppText.font,
+                  color: AppColors.amber,
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1,
+                ),
+              ),
+              SizedBox(width: 10),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.only(bottom: 3),
+                  child: Text('Brownout alerts for Iloilo', style: AppText.muted),
+                ),
+              ),
+              Text('Version 1.0.0', style: AppText.small),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Divider(),
+          const _AboutRow(
+            icon: Icons.verified_outlined,
+            label: 'Data',
+            value: 'Advisories are entered by SUGA admins from official MORE Power announcements.',
+          ),
+          const _AboutRow(icon: Icons.groups_outlined, label: 'Made by', value: 'Florencio and Olmo'),
+          const Divider(),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            onTap: _openGitHub,
+            leading: const Icon(Icons.code_rounded, color: AppColors.amber),
+            title: const Text('Source code on GitHub', style: AppText.cardTitle),
+            trailing: const Icon(Icons.open_in_new_rounded, color: AppColors.textMuted, size: 18),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SavedAreaTile extends StatelessWidget {
+  const _SavedAreaTile({required this.area, required this.isHome});
+
+  final Area area;
+  final bool isHome;
+
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.read<PowerInterruptionProvider>();
+    return SugaCard(
+      borderColor: isHome ? AppColors.amber.withValues(alpha: 0.5) : AppColors.line,
+      padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
+      child: Row(
+        children: [
+          IconTile(
+            isHome ? Icons.home_rounded : Icons.location_on_outlined,
+            color: isHome ? AppColors.amber : AppColors.textMuted,
+            background: isHome ? AppColors.amberSoft : AppColors.chip,
+            size: 40,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(area.name, style: AppText.cardTitle),
+                const SizedBox(height: 2),
+                Text(isHome ? '${area.city} · Home area' : area.city, style: AppText.small),
+              ],
             ),
-          ],
+          ),
+          if (isHome)
+            const SizedBox(width: 12)
+          else
+            PopupMenuButton<String>(
+              tooltip: 'Options for ${area.name}',
+              icon: const Icon(Icons.more_vert_rounded, color: AppColors.textMuted),
+              onSelected: (action) {
+                if (action == 'home') {
+                  provider.setMainArea(area.id);
+                } else {
+                  provider.removeSavedArea(area.id);
+                }
+              },
+              itemBuilder: (_) => const [
+                PopupMenuItem(value: 'home', child: Text('Set as home area')),
+                PopupMenuItem(
+                  value: 'remove',
+                  child: Text('Remove', style: TextStyle(color: AppColors.outage)),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddAreaTile extends StatelessWidget {
+  const _AddAreaTile({required this.firstArea, required this.onTap});
+
+  final bool firstArea;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppRadius.card),
+      child: CustomPaint(
+        painter: const _DashedBorderPainter(color: AppColors.lineStrong, radius: AppRadius.card),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                firstArea ? Icons.location_searching_rounded : Icons.add_location_alt_outlined,
+                color: AppColors.amber,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                firstArea ? 'Choose your first area' : 'Add another area',
+                style: AppText.cardTitle.copyWith(color: AppColors.amber),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _AboutRow extends StatelessWidget {
+  const _AboutRow({required this.icon, required this.label, required this.value});
+
+  final IconData icon;
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.amber, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: AppText.small),
+                const SizedBox(height: 2),
+                Text(value, style: AppText.body.copyWith(color: AppColors.text)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -994,15 +468,10 @@ class _DashedBorderPainter extends CustomPainter {
       ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.2;
-
     final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)),
-      );
-
+      ..addRRect(RRect.fromRectAndRadius(Offset.zero & size, Radius.circular(radius)));
     for (final metric in path.computeMetrics()) {
       double distance = 0;
-
       while (distance < metric.length) {
         final end = (distance + 6).clamp(0.0, metric.length);
         canvas.drawPath(metric.extractPath(distance, end), paint);
@@ -1012,7 +481,6 @@ class _DashedBorderPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) {
-    return oldDelegate.color != color || oldDelegate.radius != radius;
-  }
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.radius != radius;
 }

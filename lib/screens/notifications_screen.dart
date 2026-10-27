@@ -350,17 +350,13 @@ class _NotificationsScreenState extends State<NotificationsScreen> with WidgetsB
                   style: TextStyle(
                     color: Color(0xFF34D399),
                     fontSize: 12,
-                    fontFamily: 'monospace',
                   ),
                 ),
               ),
               TextButton(
                 onPressed: _callHotline,
                 style: TextButton.styleFrom(foregroundColor: amber),
-                child: const Text(
-                  'REPORT',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, letterSpacing: 1),
-                ),
+                child: const Text('Call', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
               ),
             ],
           ),

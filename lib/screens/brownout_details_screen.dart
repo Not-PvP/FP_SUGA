@@ -1,12 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:suga/models/power_interruption.dart';
 import 'package:intl/intl.dart';
-import 'package:suga/providers/auth_provider.dart';
-import 'package:suga/providers/notification_provider.dart';
-import 'package:suga/providers/power_interruption_provider.dart';
-import 'package:suga/utils/advisory_time.dart';
-import 'package:suga/widgets/admin_advisory_actions.dart';
 import 'package:suga/widgets/weather_card.dart';
 
 class BrownoutDetailsScreen extends StatelessWidget {
@@ -14,19 +8,8 @@ class BrownoutDetailsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final passed =
-        ModalRoute.of(context)?.settings.arguments as PowerInterruption;
-    // Use the provider's copy, so a change made by an admin shows right away.
     final brownout =
-        context.watch<PowerInterruptionProvider>().findById(passed.id) ?? passed;
-    final isAdmin = context.watch<AuthProvider>().isSignedIn;
-    final notifications = context.watch<NotificationProvider>();
-    final hasReminder = notifications.hasReminder(brownout);
-    // Reminders are only for brownouts that are still coming up.
-    final start = advisoryStart(brownout);
-    final canRemind = brownout.status.toLowerCase() == 'scheduled' &&
-        start != null &&
-        start.isAfter(DateTime.now());
+        ModalRoute.of(context)?.settings.arguments as PowerInterruption;
     final status = brownout.status.toLowerCase();
     final statusColor = switch (status) {
       'scheduled' => const Color(0xFFFBBF24),
@@ -35,7 +18,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
       _ => const Color(0xFF64748B),
     };
 
-    Widget _buildInfoSection(String label, String value) {
+    Widget buildInfoSection(String label, String value) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -60,7 +43,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
       );
     }
 
-    String _formatDuration(String start, String end) {
+    String formatDuration(String start, String end) {
       try {
         final startParts = start.split(':').map(int.parse).toList();
         final endParts = end.split(':').map(int.parse).toList();
@@ -91,7 +74,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
       }
     }
 
-    String _formatTime(String time) {
+    String formatTime(String time) {
       try {
         final parsed = DateFormat('HH:mm').parseStrict(time);
         return DateFormat('h:mm a').format(parsed);
@@ -200,7 +183,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Areas
-                  _buildInfoSection('Areas', brownout.affectedAreas.join(', ')),
+                  buildInfoSection('Areas', brownout.affectedAreas.join(', ')),
                   const SizedBox(height: 20),
 
                   // Feeders
@@ -249,16 +232,16 @@ class BrownoutDetailsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: _buildInfoSection(
+                        child: buildInfoSection(
                           'Time',
-                          '${_formatTime(brownout.startTime)} – ${_formatTime(brownout.endTime)}',
+                          '${formatTime(brownout.startTime)} – ${formatTime(brownout.endTime)}',
                         ),
                       ),
                       const SizedBox(width: 20),
                       Expanded(
-                        child: _buildInfoSection(
+                        child: buildInfoSection(
                           'Duration',
-                          _formatDuration(brownout.startTime, brownout.endTime),
+                          formatDuration(brownout.startTime, brownout.endTime),
                         ),
                       ),
                     ],
@@ -266,20 +249,20 @@ class BrownoutDetailsScreen extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // Reason
-                  _buildInfoSection('Reason', brownout.reason),
+                  buildInfoSection('Reason', brownout.reason),
                   const SizedBox(height: 20),
 
                   // Advisory Details
-                  _buildInfoSection('Advisory Details', brownout.description),
+                  buildInfoSection('Advisory Details', brownout.description),
                   const SizedBox(height: 20),
 
                   // Estimated Restoration
-                  _buildInfoSection(
+                  buildInfoSection(
                     'Estimated Restoration',
                     brownout.estimatedRestorationTime == null ||
                             brownout.estimatedRestorationTime!.trim().isEmpty
                         ? 'Not specified'
-                        : _formatTime(brownout.estimatedRestorationTime!),
+                        : formatTime(brownout.estimatedRestorationTime!),
                   ),
                 ],
               ),
@@ -291,39 +274,18 @@ class BrownoutDetailsScreen extends StatelessWidget {
 
             const SizedBox(height: 16),
 
-            // Notify Before Interruption: schedules a phone reminder for this advisory.
+            // Notify Before Interruption
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: !canRemind
-                    ? null
-                    : () async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        final willFire = await notifications.remindMe(brownout);
-                        messenger.showSnackBar(SnackBar(
-                          content: Text(willFire
-                              ? "We'll remind you ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} before it starts."
-                              : 'Saved to your alerts. Allow notifications to get a phone reminder.'),
-                        ));
-                      },
-                icon: Icon(
-                  hasReminder
-                      ? Icons.notifications_active_rounded
-                      : Icons.notifications_active_outlined,
-                  size: 20,
-                ),
-                label: Text(
-                  !canRemind
-                      ? 'No Reminder for This Advisory'
-                      : hasReminder
-                          ? 'Reminder Set · ${NotificationProvider.leadTimeLabel(notifications.leadMinutes)} Before'
-                          : 'Notify Me Before Interruption',
-                ),
+                onPressed: () {
+                  // TODO: Connect to notification scheduling.
+                },
+                icon: const Icon(Icons.notifications_active_outlined, size: 20),
+                label: const Text('Notify Me Before Interruption'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFFFFBF00),
                   foregroundColor: const Color(0xFF070A0F),
-                  disabledBackgroundColor: const Color(0xFF1F2937),
-                  disabledForegroundColor: const Color(0xFF9CA3AF),
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
@@ -336,12 +298,6 @@ class BrownoutDetailsScreen extends StatelessWidget {
                 ),
               ),
             ),
-
-            // Only signed-in admins see these.
-            if (isAdmin) ...[
-              const SizedBox(height: 16),
-              AdminAdvisoryActions(advisory: brownout),
-            ],
           ],
         ),
       ),

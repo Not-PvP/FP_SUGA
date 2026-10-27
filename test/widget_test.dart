@@ -4,11 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:provider/provider.dart';
+import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/screens/areas_screen.dart';
 import 'package:suga/services/area_service.dart';
 
 AreaService _service(http.Response Function(http.Request) handler) =>
     AreaService(client: MockClient((r) async => handler(r)), baseUrl: 'http://test');
+
+// The Areas screen reads power status from PowerInterruptionProvider.
+Widget _app(AreaService service) => ChangeNotifierProvider(
+      create: (_) => PowerInterruptionProvider(),
+      child: MaterialApp(home: AreasScreen(service: service)),
+    );
 
 void main() {
   testWidgets('Areas screen lists areas from the API', (tester) async {
@@ -23,7 +31,7 @@ void main() {
           200,
         ));
 
-    await tester.pumpWidget(MaterialApp(home: AreasScreen(service: service)));
+    await tester.pumpWidget(_app(service));
     await tester.pumpAndSettle();
 
     expect(find.text('Jaro'), findsOneWidget);
@@ -39,7 +47,7 @@ void main() {
           500,
         ));
 
-    await tester.pumpWidget(MaterialApp(home: AreasScreen(service: service)));
+    await tester.pumpWidget(_app(service));
     await tester.pumpAndSettle();
 
     expect(find.text('Something went wrong'), findsOneWidget);
