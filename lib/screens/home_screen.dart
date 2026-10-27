@@ -10,6 +10,7 @@ import 'package:suga/theme/app_theme.dart';
 import 'package:suga/widgets/power_status_widget.dart';
 import 'package:suga/widgets/ui.dart';
 import 'package:suga/widgets/upcoming_advisories_widget.dart';
+import 'package:suga/widgets/weather_card.dart';
 
 // Home tab: the power status of the home area and its next brownouts.
 class HomeScreen extends StatefulWidget {
@@ -77,6 +78,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 _AreaBar(areas: _areasFuture, areaId: areaId, onChange: _openAreas),
                 const SizedBox(height: 8),
                 const PowerStatusWidget(),
+                const SizedBox(height: 24),
+                _AreaWeather(areas: _areasFuture, areaId: areaId),
                 const SizedBox(height: 32),
                 UpcomingAdvisoriesWidget(
                   areaIds: {areaId},
@@ -176,6 +179,32 @@ class _AreaBar extends StatelessWidget {
           TextButton(onPressed: onChange, child: const Text('Change')),
         ],
       ),
+    );
+  }
+}
+
+// Current weather at the home area. Left out when the area list could not load,
+// since the weather is a bonus and should never get in the way of the power status.
+class _AreaWeather extends StatelessWidget {
+  const _AreaWeather({required this.areas, required this.areaId});
+
+  final Future<List<Area>> areas;
+  final int areaId;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Area>>(
+      future: areas,
+      builder: (context, snapshot) {
+        final matches = snapshot.data?.where((area) => area.id == areaId);
+        if (matches == null || matches.isEmpty) return const SizedBox.shrink();
+        final area = matches.first;
+        return WeatherCard(
+          latitude: area.latitude,
+          longitude: area.longitude,
+          locationName: area.name,
+        );
+      },
     );
   }
 }

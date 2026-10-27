@@ -49,8 +49,7 @@ class MyApp extends StatelessWidget {
         // Rebuilt whenever AuthProvider changes, so admin requests always carry the
         // current session token, and a 401 from the server signs the admin out.
         ChangeNotifierProxyProvider<AuthProvider, PowerInterruptionProvider>(
-          // Restores the home area picked last time, so users don't choose it again.
-          create: (_) => PowerInterruptionProvider()..restoreAreas(),
+          create: (_) => PowerInterruptionProvider(),
           update: (_, auth, interruptions) => interruptions!
             ..authToken = auth.token
             ..onUnauthorized = auth.handleUnauthorized,

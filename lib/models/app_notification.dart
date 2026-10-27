@@ -2,7 +2,14 @@ import 'package:intl/intl.dart';
 import 'package:suga/models/power_interruption.dart';
 import 'package:suga/utils/advisory_time.dart';
 
-enum NotificationKind { upcoming, ongoing, restored, updated, scheduled, cancelled }
+enum NotificationKind {
+  upcoming,
+  ongoing,
+  restored,
+  updated,
+  scheduled,
+  cancelled,
+}
 
 // One entry on the Notifications screen, made from an advisory in a followed area.
 class AppNotification {
@@ -51,11 +58,19 @@ class NotificationBuilder {
     final result = <AppNotification>[];
     for (final item in advisories) {
       // In a followed area, or the user tapped "Notify me" on this advisory.
-      if (!item.areaIds.any(areaIds.contains) && !advisoryIds.contains(item.id)) continue;
+      if (!item.areaIds.any(areaIds.contains) && !advisoryIds.contains(item.id))
+        continue;
       final entry = _entryFor(item, now: now, leadTime: leadTime);
       if (entry == null) continue;
       if (entry.kind == NotificationKind.restored && !includeRestored) continue;
-      if (entry.time.isAfter(now) || now.difference(entry.time) > window) continue;
+      if (entry.time.isAfter(now) || now.difference(entry.time) > window)
+        continue;
+      // Skip brownouts that already ended.
+      final end = _advisoryEnd(item);
+      if (end != null &&
+          !end.isAfter(now) &&
+          entry.kind != NotificationKind.restored)
+        continue;
       result.add(entry);
     }
     result.sort((a, b) => b.time.compareTo(a.time));
@@ -73,7 +88,8 @@ class NotificationBuilder {
     final posted = item.createdAt ?? changed;
     final area = _areaNames(item);
     final schedule = _schedule(item);
-    final version = (item.updatedAt ?? item.createdAt)?.millisecondsSinceEpoch ?? 0;
+    final version =
+        (item.updatedAt ?? item.createdAt)?.millisecondsSinceEpoch ?? 0;
 
     AppNotification make(
       NotificationKind kind, {
@@ -82,18 +98,17 @@ class NotificationBuilder {
       required String message,
       required String badge,
       required String actionLabel,
-    }) =>
-        AppNotification(
-          key: '${item.id}:${kind.name}:$version',
-          kind: kind,
-          advisory: item,
-          time: time.toUtc(),
-          title: title,
-          area: area,
-          message: message,
-          badge: badge,
-          actionLabel: actionLabel,
-        );
+    }) => AppNotification(
+      key: '${item.id}:${kind.name}:$version',
+      kind: kind,
+      advisory: item,
+      time: time.toUtc(),
+      title: title,
+      area: area,
+      message: message,
+      badge: badge,
+      actionLabel: actionLabel,
+    );
 
     switch (item.status.toLowerCase()) {
       case 'restored':
@@ -111,7 +126,8 @@ class NotificationBuilder {
           NotificationKind.ongoing,
           time: changed,
           title: 'Brownout Ongoing',
-          message: ': power is out now. Expected back by '
+          message:
+              ': power is out now. Expected back by '
               '${_time(until != null && until.isNotEmpty ? until : item.endTime)}.',
           badge: 'Ongoing',
           actionLabel: 'Brownout details',
@@ -130,7 +146,9 @@ class NotificationBuilder {
 
     // Scheduled: a reminder once the lead time is reached, otherwise the announcement.
     final remindAt = start.subtract(leadTime);
-    final feederNote = item.feeders.isEmpty ? '' : ' ${_feeders(item.feeders)} affected.';
+    final feederNote = item.feeders.isEmpty
+        ? ''
+        : ' ${_feeders(item.feeders)} affected.';
     if (!now.isBefore(remindAt) && now.isBefore(start)) {
       return make(
         NotificationKind.upcoming,
@@ -141,9 +159,11 @@ class NotificationBuilder {
         actionLabel: 'Brownout details',
       );
     }
-    final edited = item.createdAt != null &&
+    final edited =
+        item.createdAt != null &&
         item.updatedAt != null &&
-        item.updatedAt!.difference(item.createdAt!) > const Duration(minutes: 1);
+        item.updatedAt!.difference(item.createdAt!) >
+            const Duration(minutes: 1);
     if (edited) {
       return make(
         NotificationKind.updated,
@@ -166,11 +186,32 @@ class NotificationBuilder {
 
   // "Jaro, Iloilo City" -> "Jaro". Several areas are joined: "Jaro and Molo".
   static String _areaNames(PowerInterruption item) {
-    final names = item.affectedAreas.map((a) => a.split(',').first.trim()).where((a) => a.isNotEmpty).toList();
+    final names = item.affectedAreas
+        .map((a) => a.split(',').first.trim())
+        .where((a) => a.isNotEmpty)
+        .toList();
     if (names.isEmpty) return 'Your area';
     if (names.length == 1) return names.first;
     if (names.length == 2) return '${names[0]} and ${names[1]}';
     return '${names.take(names.length - 1).join(', ')} and ${names.last}';
+  }
+
+  // When the brownout ends, in local time. Null if the date or times can't be read.
+  static DateTime? _advisoryEnd(PowerInterruption item) {
+    final day = DateTime.tryParse(item.date);
+    final s = item.startTime.split(':');
+    final e = item.endTime.split(':');
+    if (day == null || s.length < 2 || e.length < 2) return null;
+
+    final sh = int.tryParse(s[0]), sm = int.tryParse(s[1]);
+    final eh = int.tryParse(e[0]), em = int.tryParse(e[1]);
+    if (sh == null || sm == null || eh == null || em == null) return null;
+
+    final start = DateTime(day.year, day.month, day.day, sh, sm);
+    var end = DateTime(day.year, day.month, day.day, eh, em);
+    if (!end.isAfter(start))
+      end = end.add(const Duration(days: 1)); // runs past midnight
+    return end;
   }
 
   static String _feeders(List<String> feeders) =>

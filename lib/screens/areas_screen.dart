@@ -27,15 +27,26 @@ class AreasScreen extends StatefulWidget {
 class _AreasScreenState extends State<AreasScreen> {
   late final AreaService _service = widget.service ?? AreaService();
   late Future<List<Area>> _areas = _service.fetchAreas();
+  final TextEditingController _searchController = TextEditingController();
   String _search = '';
   Timer? _searchDebounce;
 
   void _searchAreas(String value) {
-    _search = value;
+    // Rebuild right away so the clear button appears while typing.
+    setState(() => _search = value);
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
       setState(() => _areas = _service.fetchAreas(search: _search));
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    setState(() {
+      _search = '';
+      _areas = _service.fetchAreas();
     });
   }
 
@@ -64,6 +75,7 @@ class _AreasScreenState extends State<AreasScreen> {
   @override
   void dispose() {
     _searchDebounce?.cancel();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -82,9 +94,17 @@ class _AreasScreenState extends State<AreasScreen> {
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 4, 20, 12),
               child: TextField(
+                controller: _searchController,
                 style: AppText.body.copyWith(color: AppColors.text),
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.search_rounded),
+                decoration: InputDecoration(
+                  prefixIcon: const Icon(Icons.search_rounded),
+                  suffixIcon: _search.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.close_rounded, size: 20),
+                          tooltip: 'Clear search',
+                          onPressed: _clearSearch,
+                        ),
                   hintText: 'Search areas, like Jaro or Molo',
                 ),
                 textInputAction: TextInputAction.search,

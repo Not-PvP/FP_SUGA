@@ -9,6 +9,7 @@ import 'package:suga/utils/advisory_time.dart';
 import 'package:suga/utils/format.dart';
 import 'package:suga/widgets/power_status_widget.dart';
 import 'package:suga/widgets/ui.dart';
+import 'package:suga/widgets/weather_card.dart';
 import 'package:suga/widgets/upcoming_advisories_widget.dart';
 
 // One area: its power status, feeders and upcoming brownouts.
@@ -115,6 +116,12 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
         ),
         const SizedBox(height: 8),
         PowerStatusWidget(areaId: area.id, bulbSize: 150),
+        const SizedBox(height: 24),
+        WeatherCard(
+          latitude: area.latitude,
+          longitude: area.longitude,
+          locationName: area.name,
+        ),
         const SizedBox(height: 32),
         const SectionLabel('Feeders'),
         if (area.feeders.isEmpty)

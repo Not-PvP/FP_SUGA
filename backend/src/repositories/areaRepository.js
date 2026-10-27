@@ -17,24 +17,58 @@ function toFeeder(row) {
 }
 
 // `search` matches part of the name or city; `city` must match exactly. Both ignore case.
+
 export async function findAllAreas({ search, city } = {}) {
   const where = [];
   const args = [];
+
   if (search) {
     where.push("(name LIKE ? ESCAPE '\\' OR city LIKE ? ESCAPE '\\')");
     const pattern = `%${search.replace(/[\\%_]/g, '\\$&')}%`;
     args.push(pattern, pattern);
   }
+
   if (city) {
     where.push('city = ? COLLATE NOCASE');
     args.push(city);
   }
+
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  const result = await db.execute({
-    sql: `SELECT * FROM areas ${clause} ORDER BY name, city`,
-    args,
-  });
-  return result.rows.map(toArea);
+
+  const [areaResult, feederResult] = await db.batch(
+    [
+      {
+        sql: `SELECT * FROM areas ${clause} ORDER BY name, city`,
+        args,
+      },
+      {
+        sql: `SELECT feeders.* FROM feeders
+              INNER JOIN areas ON feeders.area_id = areas.id
+              ${clause ? clause.replace(/\bname\b/g, 'areas.name').replace(/\bcity\b/g, 'areas.city') : ''}
+              ORDER BY feeders.name`,
+        args,
+      },
+    ],
+    'read',
+  );
+
+  const feedersByArea = new Map();
+
+  for (const row of feederResult.rows) {
+    const feeder = toFeeder(row);
+    const areaId = row.area_id;
+
+    if (!feedersByArea.has(areaId)) {
+      feedersByArea.set(areaId, []);
+    }
+
+    feedersByArea.get(areaId).push(feeder);
+  }
+
+  return areaResult.rows.map((row) => ({
+    ...toArea(row),
+    feeders: feedersByArea.get(row.id) ?? [],
+  }));
 }
 
 // Finds an area with the same name and city, ignoring case. Used to reject duplicates.
