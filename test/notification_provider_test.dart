@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:suga/providers/notification_provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/services/interruption_service.dart';
-import 'package:suga/services/notification_service.dart';
 
 import 'support/fake_device.dart';
 

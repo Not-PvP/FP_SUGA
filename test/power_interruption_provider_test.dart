@@ -57,6 +57,8 @@ final _new = PowerInterruption(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('loadInterruptions stores the list sorted by date and time, and tracks loading', () async {
     final provider = _provider((_) async => _ok([
           _json(2, date: '2026-10-14'),

@@ -37,7 +37,9 @@ class _AreasScreenState extends State<AreasScreen> {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 350), () {
       if (!mounted) return;
-      setState(() => _areas = _service.fetchAreas(search: _search));
+      setState(() {
+        _areas = _service.fetchAreas(search: _search);
+      });
     });
   }
 
@@ -51,7 +53,9 @@ class _AreasScreenState extends State<AreasScreen> {
   }
 
   void _load() {
-    setState(() => _areas = _service.fetchAreas(search: _search));
+    setState(() {
+      _areas = _service.fetchAreas(search: _search);
+    });
   }
 
   // Area Details returns true when the user tapped "Set as home area".

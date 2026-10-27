@@ -58,19 +58,22 @@ class NotificationBuilder {
     final result = <AppNotification>[];
     for (final item in advisories) {
       // In a followed area, or the user tapped "Notify me" on this advisory.
-      if (!item.areaIds.any(areaIds.contains) && !advisoryIds.contains(item.id))
+      if (!item.areaIds.any(areaIds.contains) && !advisoryIds.contains(item.id)) {
         continue;
+      }
       final entry = _entryFor(item, now: now, leadTime: leadTime);
       if (entry == null) continue;
       if (entry.kind == NotificationKind.restored && !includeRestored) continue;
-      if (entry.time.isAfter(now) || now.difference(entry.time) > window)
+      if (entry.time.isAfter(now) || now.difference(entry.time) > window) {
         continue;
+      }
       // Skip brownouts that already ended.
       final end = _advisoryEnd(item);
       if (end != null &&
           !end.isAfter(now) &&
-          entry.kind != NotificationKind.restored)
+          entry.kind != NotificationKind.restored) {
         continue;
+      }
       result.add(entry);
     }
     result.sort((a, b) => b.time.compareTo(a.time));
@@ -209,8 +212,9 @@ class NotificationBuilder {
 
     final start = DateTime(day.year, day.month, day.day, sh, sm);
     var end = DateTime(day.year, day.month, day.day, eh, em);
-    if (!end.isAfter(start))
+    if (!end.isAfter(start)) {
       end = end.add(const Duration(days: 1)); // runs past midnight
+    }
     return end;
   }
 

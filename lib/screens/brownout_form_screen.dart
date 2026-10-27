@@ -148,10 +148,12 @@ class _BrownoutFormScreenState extends State<BrownoutFormScreen> {
 
   // Call inside setState.
   void _clearError(String key) {
-    if (_localErrors.containsKey(key))
+    if (_localErrors.containsKey(key)) {
       _localErrors = {..._localErrors}..remove(key);
-    if (_serverErrors.containsKey(key))
+    }
+    if (_serverErrors.containsKey(key)) {
       _serverErrors = {..._serverErrors}..remove(key);
+    }
   }
 
   Widget _pickerTheme(BuildContext context, Widget? child) {
@@ -270,7 +272,9 @@ class _BrownoutFormScreenState extends State<BrownoutFormScreen> {
   }
 
   void _reloadAreas() {
-    setState(() => _areas = _areaService.fetchAreas());
+    setState(() {
+      _areas = _areaService.fetchAreas();
+    });
   }
 
   Map<String, String> _validate() {
@@ -285,8 +289,9 @@ class _BrownoutFormScreenState extends State<BrownoutFormScreen> {
     } else if (start != null && _minutes(end) <= _minutes(start)) {
       errors['end_time'] = 'End time must be later than the start time.';
     }
-    if (_areaIds.isEmpty)
+    if (_areaIds.isEmpty) {
       errors['area_ids'] = 'Select at least one affected area.';
+    }
     return errors;
   }
 

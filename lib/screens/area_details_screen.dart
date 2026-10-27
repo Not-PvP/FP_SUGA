@@ -36,7 +36,11 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
     _area ??= _service.fetchArea(_id!);
   }
 
-  void _retry() => setState(() => _area = _service.fetchArea(_id!));
+  void _retry() {
+    setState(() {
+      _area = _service.fetchArea(_id!);
+    });
+  }
 
   void _setAsHome(Area area) {
     context.read<PowerInterruptionProvider>().setAreaFilter(area.id);

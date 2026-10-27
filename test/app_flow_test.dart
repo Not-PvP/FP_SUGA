@@ -218,7 +218,8 @@ void main() {
       expect(find.text('Molo Line Work'), findsOneWidget);
 
       await _tap(tester, find.text('Jaro Power Interruption'));
-      expect(find.text('Notify Me Before Interruption'), findsOneWidget);
+      // Jaro is a saved area, so its reminder is already set.
+      expect(find.textContaining('Reminder Set'), findsOneWidget);
       expect(find.text('Maintenance'), findsOneWidget);
     }, prefs: _savedJaro);
   });
