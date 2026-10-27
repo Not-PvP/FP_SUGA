@@ -40,7 +40,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
       _ => const Color(0xFF64748B),
     };
 
-    Widget _buildInfoSection(String label, String value) {
+    Widget buildInfoSection(String label, String value) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -65,7 +65,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
       );
     }
 
-    String _formatDuration(String start, String end) {
+    String formatDuration(String start, String end) {
       try {
         final startParts = start.split(':').map(int.parse).toList();
         final endParts = end.split(':').map(int.parse).toList();
@@ -96,7 +96,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
       }
     }
 
-    String _formatTime(String time) {
+    String formatTime(String time) {
       try {
         final parsed = DateFormat('HH:mm').parseStrict(time);
         return DateFormat('h:mm a').format(parsed);
@@ -251,7 +251,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Areas
-                  _buildInfoSection('Areas', brownout.affectedAreas.join(', ')),
+                  buildInfoSection('Areas', brownout.affectedAreas.join(', ')),
                   const SizedBox(height: 20),
 
                   // Feeders
@@ -300,16 +300,16 @@ class BrownoutDetailsScreen extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Expanded(
-                        child: _buildInfoSection(
+                        child: buildInfoSection(
                           'Time',
-                          '${_formatTime(brownout.startTime)} – ${_formatTime(brownout.endTime)}',
+                          '${formatTime(brownout.startTime)} – ${formatTime(brownout.endTime)}',
                         ),
                       ),
                       const SizedBox(width: 20),
                       Expanded(
-                        child: _buildInfoSection(
+                        child: buildInfoSection(
                           'Duration',
-                          _formatDuration(brownout.startTime, brownout.endTime),
+                          formatDuration(brownout.startTime, brownout.endTime),
                         ),
                       ),
                     ],
@@ -317,85 +317,30 @@ class BrownoutDetailsScreen extends StatelessWidget {
                   const SizedBox(height: 20),
 
                   // Reason
-                  _buildInfoSection('Reason', brownout.reason),
+                  buildInfoSection('Reason', brownout.reason),
                   const SizedBox(height: 20),
 
                   // Advisory Details
-                  _buildInfoSection('Advisory Details', brownout.description),
+                  buildInfoSection('Advisory Details', brownout.description),
                   const SizedBox(height: 20),
 
                   // Estimated Restoration
-                  _buildInfoSection(
+                  buildInfoSection(
                     'Estimated Restoration',
                     brownout.estimatedRestorationTime == null ||
                             brownout.estimatedRestorationTime!.trim().isEmpty
                         ? 'Not specified'
-                        : _formatTime(brownout.estimatedRestorationTime!),
+                        : formatTime(brownout.estimatedRestorationTime!),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Weather Card
-            FutureBuilder<List<Area>>(
-              future: AreaService().fetchAreas(),
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return const Text(
-                    'Unable to load weather for this area.',
-                    style: TextStyle(color: Color(0xFF9CA3AF)),
-                  );
-                }
-
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Color(0xFFFFBF00)),
-                  );
-                }
-
-                if (!snapshot.hasData) {
-                  return const Text(
-                    'Weather area information is unavailable.',
-                    style: TextStyle(color: Color(0xFF9CA3AF)),
-                  );
-                }
-
-                // Use the first affected area that matches an area from the API.
-                final affectedAreaNames = brownout.affectedAreas
-                    .map((name) => name.trim().toLowerCase())
-                    .toSet();
-
-                final matchingAreas = snapshot.data!.where(
-                  (area) => affectedAreaNames.contains(
-                    area.name.trim().toLowerCase(),
-                  ),
-                );
-
-                if (start == null) {
-                  return const Text(
-                    'Weather unavailable: scheduled start time could not be determined.',
-                    style: TextStyle(color: Color(0xFF9CA3AF)),
-                  );
-                }
-
-                if (matchingAreas.isEmpty) {
-                  return Text(
-                    'Weather unavailable: no matching area found for '
-                    '${brownout.affectedAreas.join(', ')}.',
-                    style: const TextStyle(color: Color(0xFF9CA3AF)),
-                  );
-                }
-
-                final affectedArea = matchingAreas.first;
-
-                return WeatherCard(
-                  latitude: affectedArea.latitude,
-                  longitude: affectedArea.longitude,
-                  locationName: affectedArea.name,
-                  forecastDateTime: start,
-                );
-              },
+            // Weather at the affected area when the brownout starts.
+            _AdvisoryWeather(
+              areaNames: brownout.affectedAreas,
+              start: start,
             ),
 
             const SizedBox(height: 16),
@@ -458,6 +403,79 @@ class BrownoutDetailsScreen extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// The forecast for the area a brownout affects.
+//
+// It is its own StatefulWidget so the area list is requested once. The screen
+// above rebuilds whenever the advisories, the session or the notifications
+// change (the notification clock alone ticks every minute), and a FutureBuilder
+// that creates its future inside build() would call the API again each time.
+class _AdvisoryWeather extends StatefulWidget {
+  const _AdvisoryWeather({required this.areaNames, required this.start});
+
+  final List<String> areaNames;
+  final DateTime? start;
+
+  @override
+  State<_AdvisoryWeather> createState() => _AdvisoryWeatherState();
+}
+
+class _AdvisoryWeatherState extends State<_AdvisoryWeather> {
+  late final Future<List<Area>> _areas = AreaService().fetchAreas();
+
+  static const _muted = TextStyle(color: Color(0xFF9CA3AF));
+
+  @override
+  Widget build(BuildContext context) {
+    final start = widget.start;
+    return FutureBuilder<List<Area>>(
+      future: _areas,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Text('Unable to load weather for this area.', style: _muted);
+        }
+
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFFFFBF00)),
+          );
+        }
+
+        if (!snapshot.hasData) {
+          return const Text('Weather area information is unavailable.', style: _muted);
+        }
+
+        if (start == null) {
+          return const Text(
+            'Weather unavailable: scheduled start time could not be determined.',
+            style: _muted,
+          );
+        }
+
+        // Use the first affected area that matches an area from the API.
+        final names = widget.areaNames.map((name) => name.trim().toLowerCase()).toSet();
+        final matching = snapshot.data!.where(
+          (area) => names.contains(area.name.trim().toLowerCase()),
+        );
+
+        if (matching.isEmpty) {
+          return Text(
+            'Weather unavailable: no matching area found for ${widget.areaNames.join(', ')}.',
+            style: _muted,
+          );
+        }
+
+        final area = matching.first;
+        return WeatherCard(
+          latitude: area.latitude,
+          longitude: area.longitude,
+          locationName: area.name,
+          forecastDateTime: start,
+        );
+      },
     );
   }
 }
