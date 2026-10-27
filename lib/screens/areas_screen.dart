@@ -122,12 +122,10 @@ class _AreasScreenState extends State<AreasScreen> {
                     return ListView(
                       padding: const EdgeInsets.all(20),
                       children: [
-                        StatePanel(
-                          icon: Icons.cloud_off_rounded,
-                          title: "Couldn't load areas",
-                          message: '${snapshot.error}',
-                          actionLabel: 'Retry',
-                          onAction: _load,
+                        ErrorPanel(
+                          what: 'areas',
+                          error: snapshot.error!,
+                          onRetry: _load,
                         ),
                       ],
                     );

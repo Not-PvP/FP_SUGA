@@ -89,12 +89,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           );
         }
         if (snapshot.hasError) {
-          return StatePanel(
-            icon: Icons.cloud_off_rounded,
-            title: "Couldn't load your areas",
-            message: '${snapshot.error}',
-            actionLabel: 'Retry',
-            onAction: _retryAreas,
+          return ErrorPanel(
+            what: 'your areas',
+            error: snapshot.error!,
+            onRetry: _retryAreas,
           );
         }
 

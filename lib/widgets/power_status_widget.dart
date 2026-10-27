@@ -137,6 +137,9 @@ class _PowerStatusWidgetState extends State<PowerStatusWidget>
             textAlign: TextAlign.center,
             style: AppText.small,
           ),
+          // Showing older data: let people try again without hunting for pull-to-refresh.
+          if (provider.error != null && loaded)
+            TextButton(onPressed: provider.loadInterruptions, child: const Text('Retry')),
         ],
       ],
     );

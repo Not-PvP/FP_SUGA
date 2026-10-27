@@ -536,12 +536,10 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
       body = ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          StatePanel(
-            icon: Icons.cloud_off_rounded,
-            title: "Couldn't load brownouts",
-            message: provider.error!,
-            actionLabel: 'Retry',
-            onAction: provider.loadInterruptions,
+          ErrorPanel(
+            what: 'brownouts',
+            error: provider.errorDetails!,
+            onRetry: provider.loadInterruptions,
           ),
         ],
       );
@@ -552,6 +550,16 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
+            // The list below is the last one that loaded, so say it may be out of date.
+            if (provider.error != null) ...[
+              InlineNotice(
+                icon: Icons.cloud_off_rounded,
+                message: "Couldn't refresh. Showing the list from when it last loaded.",
+                actionLabel: 'Retry',
+                onAction: provider.loadInterruptions,
+              ),
+              const SizedBox(height: 12),
+            ],
             showAll
                 ? _buildAllAdvisories(items)
                 : UpcomingAdvisoriesWidget(

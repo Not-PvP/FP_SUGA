@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:suga/services/api_client.dart';
 import 'package:suga/theme/app_theme.dart';
 
 // Small building blocks shared by every screen.
@@ -231,6 +232,90 @@ class StatePanel extends StatelessWidget {
               const SizedBox(height: 16),
               OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// A failed load, worded for the kind of failure: offline, slow server, or a
+// server problem. Always offers Retry when [onRetry] is given.
+class ErrorPanel extends StatelessWidget {
+  const ErrorPanel({
+    super.key,
+    required this.what,
+    required this.error,
+    this.onRetry,
+  });
+
+  // What failed to load, in lower case: "areas", "brownouts".
+  final String what;
+  final Object error;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final kind = error is ApiException ? (error as ApiException).kind : null;
+    final IconData icon;
+    final String title;
+    switch (kind) {
+      case ApiErrorKind.offline:
+        icon = Icons.wifi_off_rounded;
+        title = "You're offline";
+      case ApiErrorKind.timeout:
+        icon = Icons.hourglass_disabled_rounded;
+        title = 'SUGA is taking too long to respond';
+      default:
+        icon = Icons.cloud_off_rounded;
+        title = "Couldn't load $what";
+    }
+    return StatePanel(
+      icon: icon,
+      title: title,
+      message: friendlyError(error),
+      actionLabel: onRetry == null ? null : 'Retry',
+      onAction: onRetry,
+    );
+  }
+}
+
+// A slim notice above a list, for something that does not block it: "Couldn't
+// refresh. Showing what we loaded earlier."
+class InlineNotice extends StatelessWidget {
+  const InlineNotice({
+    super.key,
+    required this.message,
+    this.icon = Icons.info_outline_rounded,
+    this.color = AppColors.amber,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String message;
+  final IconData icon;
+  final Color color;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      liveRegion: true,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 10),
+            Expanded(child: Text(message, style: AppText.muted)),
+            if (actionLabel != null && onAction != null)
+              TextButton(onPressed: onAction, child: Text(actionLabel!)),
           ],
         ),
       ),

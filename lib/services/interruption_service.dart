@@ -2,7 +2,7 @@ import 'package:http/http.dart' as http;
 import 'package:suga/models/power_interruption.dart';
 import 'package:suga/services/api_client.dart';
 
-export 'package:suga/services/api_client.dart' show ApiException;
+export 'package:suga/services/api_client.dart' show ApiErrorKind, ApiException, friendlyError;
 
 class InterruptionService {
   InterruptionService({http.Client? client, String? baseUrl})
@@ -18,26 +18,23 @@ class InterruptionService {
     final body = await _api.get('/api/interruptions', query: {
       if (areaId != null) 'area_id': '$areaId',
     });
-    return [
-      for (final item in body['data'] as List<dynamic>)
-        PowerInterruption.fromJson(item as Map<String, dynamic>),
-    ];
+    return ApiClient.parseList(body, PowerInterruption.fromJson);
   }
 
   Future<PowerInterruption> fetchInterruption(int id) async {
     final body = await _api.get('/api/interruptions/$id');
-    return PowerInterruption.fromJson(body['data'] as Map<String, dynamic>);
+    return ApiClient.parseOne(body, PowerInterruption.fromJson);
   }
 
   // Returns the saved interruption, including the id the server gave it.
   Future<PowerInterruption> createInterruption(PowerInterruption interruption) async {
     final body = await _api.post('/api/interruptions', interruption.toRequestJson());
-    return PowerInterruption.fromJson(body['data'] as Map<String, dynamic>);
+    return ApiClient.parseOne(body, PowerInterruption.fromJson);
   }
 
   Future<PowerInterruption> updateInterruption(int id, PowerInterruption interruption) async {
     final body = await _api.patch('/api/interruptions/$id', interruption.toRequestJson());
-    return PowerInterruption.fromJson(body['data'] as Map<String, dynamic>);
+    return ApiClient.parseOne(body, PowerInterruption.fromJson);
   }
 
   Future<void> deleteInterruption(int id) => _api.delete('/api/interruptions/$id');

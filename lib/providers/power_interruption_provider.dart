@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:suga/models/power_interruption.dart';
@@ -29,12 +31,14 @@ class PowerInterruptionProvider extends ChangeNotifier {
   bool _isSaving = false;
   bool _hasLoaded = false;
   String? _error;
+  Object? _errorDetails;
   String? _actionError;
   Map<String, String> _fieldErrors = const {};
   Future<void>? _pendingLoad;
   bool _disposed = false;
   DateTime? _lastUpdated;
   bool _areasRestored = false;
+  bool _fromCache = false;
 
   Future<void> _loadAreaPreferences() async {
     try {
@@ -109,6 +113,14 @@ class PowerInterruptionProvider extends ChangeNotifier {
 
   // Why the last load failed. The list keeps the last data that loaded successfully.
   String? get error => _error;
+
+  // The exception behind [error], so screens can word it for the kind of failure
+  // (offline, timeout, server problem). Null when the last load worked.
+  Object? get errorDetails => _errorDetails;
+
+  // True when the list on screen was read from the phone because the server
+  // could not be reached on startup.
+  bool get isFromCache => _fromCache;
 
   // Why the last add, update or delete failed, e.g. for a SnackBar.
   String? get actionError => _actionError;
@@ -236,16 +248,68 @@ class PowerInterruptionProvider extends ChangeNotifier {
   Future<void> _load() async {
     _isLoading = true;
     _error = null;
+    _errorDetails = null;
     _notify();
     try {
       _all = _sorted(await _service.fetchInterruptions());
       _hasLoaded = true;
+      _fromCache = false;
       _lastUpdated = DateTime.now();
+      unawaited(_saveCache());
     } on ApiException catch (e) {
       _error = e.message;
+      _errorDetails = e;
+    } catch (e) {
+      // Anything unexpected must end as an error message, never an unhandled crash.
+      debugPrint('Could not load interruptions: $e');
+      _error = friendlyError(e);
+      _errorDetails = e;
     } finally {
       _isLoading = false;
       _notify();
+    }
+    // First load failed (offline, server down): fall back to the last saved list.
+    if (_error != null && !_hasLoaded) await _restoreCache();
+  }
+
+  // The last list that loaded is kept on the phone, so a cold start without a
+  // connection still shows the advisories people saw before.
+  static const _kCache = 'advisories.cache';
+
+  Future<void> _saveCache() async {
+    try {
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+      await prefs.setString(
+        _kCache,
+        jsonEncode({
+          'savedAt': DateTime.now().toUtc().toIso8601String(),
+          'items': [for (final item in _all) item.toJson()],
+        }),
+      );
+    } catch (e) {
+      debugPrint('Could not save the advisory cache: $e');
+    }
+  }
+
+  Future<void> _restoreCache() async {
+    try {
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+      final text = prefs.getString(_kCache);
+      if (text == null) return;
+      final cached = jsonDecode(text) as Map<String, dynamic>;
+      final items = [
+        for (final row in cached['items'] as List<dynamic>)
+          PowerInterruption.fromJson(row as Map<String, dynamic>),
+      ];
+      // A load that finished while this was reading wins over the old copy.
+      if (_hasLoaded) return;
+      _all = _sorted(items);
+      _hasLoaded = true;
+      _fromCache = true;
+      _lastUpdated = DateTime.tryParse('${cached['savedAt']}')?.toLocal();
+      _notify();
+    } catch (e) {
+      debugPrint('Could not read the advisory cache: $e');
     }
   }
 
