@@ -11,6 +11,7 @@ import 'package:suga/widgets/weather_card.dart';
 import 'package:suga/routes/app_routes.dart';
 import 'package:suga/models/area.dart';
 import 'package:suga/services/area_service.dart';
+import 'package:suga/widgets/status_badge.dart';
 
 class BrownoutDetailsScreen extends StatelessWidget {
   const BrownoutDetailsScreen({super.key});
@@ -33,12 +34,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
         start != null &&
         start.isAfter(DateTime.now());
     final status = brownout.status.toLowerCase();
-    final statusColor = switch (status) {
-      'scheduled' => const Color(0xFFFBBF24),
-      'restored' => const Color(0xFF34D399),
-      'cancelled' || 'canceled' => const Color(0xFFF87171),
-      _ => const Color(0xFF64748B),
-    };
+    final statusColor = StatusBadge.colorFor(status);
 
     Widget buildInfoSection(String label, String value) {
       return Column(
@@ -338,10 +334,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
             const SizedBox(height: 20),
 
             // Weather at the affected area when the brownout starts.
-            _AdvisoryWeather(
-              areaNames: brownout.affectedAreas,
-              start: start,
-            ),
+            _AdvisoryWeather(areaNames: brownout.affectedAreas, start: start),
 
             const SizedBox(height: 16),
 
@@ -435,7 +428,10 @@ class _AdvisoryWeatherState extends State<_AdvisoryWeather> {
       future: _areas,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Text('Unable to load weather for this area.', style: _muted);
+          return const Text(
+            'Unable to load weather for this area.',
+            style: _muted,
+          );
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -445,7 +441,10 @@ class _AdvisoryWeatherState extends State<_AdvisoryWeather> {
         }
 
         if (!snapshot.hasData) {
-          return const Text('Weather area information is unavailable.', style: _muted);
+          return const Text(
+            'Weather area information is unavailable.',
+            style: _muted,
+          );
         }
 
         if (start == null) {
@@ -456,7 +455,9 @@ class _AdvisoryWeatherState extends State<_AdvisoryWeather> {
         }
 
         // Use the first affected area that matches an area from the API.
-        final names = widget.areaNames.map((name) => name.trim().toLowerCase()).toSet();
+        final names = widget.areaNames
+            .map((name) => name.trim().toLowerCase())
+            .toSet();
         final matching = snapshot.data!.where(
           (area) => names.contains(area.name.trim().toLowerCase()),
         );
