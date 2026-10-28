@@ -1,0 +1,75 @@
+@base = http://localhost:3000
+# Paste ADMIN_API_KEY from backend/.env here before the demo. Never commit the real key.
+@key = change-me
+
+### 0. Health check
+GET {{base}}/api/health
+
+### 1. READ all interruptions (public, no key needed)
+GET {{base}}/api/interruptions
+
+### 2. READ all areas (public). Note an area id to use below.
+GET {{base}}/api/areas
+
+### 3. CREATE an interruption (admin). Copy the returned data.id into the requests below.
+POST {{base}}/api/interruptions
+x-api-key: {{key}}
+Content-Type: application/json
+
+{
+  "title": "Demo: Line Maintenance",
+  "description": "Live demo advisory created through the REST API.",
+  "date": "2026-10-30",
+  "start_time": "09:00",
+  "end_time": "13:00",
+  "reason": "Line Maintenance",
+  "status": "scheduled",
+  "estimated_restoration": "13:00",
+  "area_ids": [1]
+}
+
+### 4. READ it back
+GET {{base}}/api/interruptions/ID_HERE
+
+### 5. UPDATE it (PATCH: only the fields you send change)
+PATCH {{base}}/api/interruptions/ID_HERE
+x-api-key: {{key}}
+Content-Type: application/json
+
+{ "status": "ongoing", "end_time": "14:00" }
+
+### 6. VALIDATION error (expect 400 VALIDATION_ERROR with a message per field)
+POST {{base}}/api/interruptions
+x-api-key: {{key}}
+Content-Type: application/json
+
+{ "title": "Bad one", "date": "2026-13-45", "start_time": "25:00", "end_time": "09:00", "area_ids": [] }
+
+### 7. AUTH error (expect 401: no key, no token)
+DELETE {{base}}/api/interruptions/ID_HERE
+
+### 8. DELETE it (admin)
+DELETE {{base}}/api/interruptions/ID_HERE
+x-api-key: {{key}}
+
+### 9. NOT FOUND (expect 404 after the delete)
+GET {{base}}/api/interruptions/ID_HERE
+
+### Areas CRUD. Areas need latitude and longitude too.
+### A. CREATE an area
+POST {{base}}/api/areas
+x-api-key: {{key}}
+Content-Type: application/json
+
+{ "name": "Demo Area", "city": "Iloilo City", "latitude": 10.72, "longitude": 122.56 }
+
+### B. UPDATE the area
+PATCH {{base}}/api/areas/ID_HERE
+x-api-key: {{key}}
+Content-Type: application/json
+
+{ "name": "Demo Area Renamed" }
+
+### C. DELETE the area
+DELETE {{base}}/api/areas/ID_HERE
+x-api-key: {{key}}

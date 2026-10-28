@@ -64,7 +64,7 @@ class PowerInterruption {
     if (value is! String || value.isEmpty) return null;
     final text = value.replaceFirst(' ', 'T');
     final hasZone = text.endsWith('Z') || RegExp(r'[+-]\d\d:\d\d$').hasMatch(text);
-    return DateTime.tryParse(hasZone ? text : '$text+08:00');
+    return DateTime.tryParse(hasZone ? text : '${text}Z');
   }
 
   static List<String> _strings(dynamic value) =>
