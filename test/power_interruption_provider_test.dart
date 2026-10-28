@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:suga/models/power_interruption.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/services/interruption_service.dart';
@@ -55,14 +57,24 @@ final _new = PowerInterruption(
 );
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('loadInterruptions stores the list sorted by date and time, and tracks loading', () async {
     final provider = _provider((_) async => _ok([
           _json(2, date: '2026-10-14'),
           _json(1, date: '2026-10-12', start: '17:00'),
           _json(3, date: '2026-10-12', start: '09:00'),
         ]));
+    // Records only changes to isLoading: the provider also notifies once when the
+    // saved areas finish loading, which is not what this test is about.
     final loadingStates = <bool>[];
-    provider.addListener(() => loadingStates.add(provider.isLoading));
+    var wasLoading = false;
+    provider.addListener(() {
+      if (provider.isLoading != wasLoading) {
+        wasLoading = provider.isLoading;
+        loadingStates.add(wasLoading);
+      }
+    });
 
     await provider.loadInterruptions();
 
@@ -217,5 +229,73 @@ void main() {
     final load = provider.loadInterruptions();
     provider.dispose();
     await expectLater(load, completes);
+  });
+
+  group('offline handling', () {
+    setUp(() => SharedPreferences.setMockInitialValues({}));
+
+    test('an unreadable reply ends as an error message, not a crash', () async {
+      final provider = _provider((_) async => http.Response('<html>Bad gateway</html>', 502));
+
+      await provider.loadInterruptions();
+
+      expect(provider.error, isNotNull);
+      expect((provider.errorDetails as ApiException).kind, ApiErrorKind.badResponse);
+      expect(provider.hasLoaded, isFalse);
+      expect(provider.isLoading, isFalse);
+    });
+
+    test('a record the app cannot read is skipped, the rest still load', () async {
+      final provider = _provider((_) async => _ok([
+            _json(1),
+            {'id': 2, 'area_ids': ['not a number']},
+            _json(3),
+          ]));
+
+      await provider.loadInterruptions();
+
+      expect(provider.allInterruptions.map((i) => i.id), ['1', '3']);
+      expect(provider.error, isNull);
+    });
+
+    test('a timeout is reported as a timeout', () async {
+      final provider = _provider((_) async => throw TimeoutException('slow'));
+
+      await provider.loadInterruptions();
+
+      expect((provider.errorDetails as ApiException).kind, ApiErrorKind.timeout);
+    });
+
+    test('the last list is shown from the phone when the first load fails', () async {
+      var offline = false;
+      Future<http.Response> handler(http.Request _) async =>
+          offline ? throw http.ClientException('no route') : _ok([_json(1), _json(2, date: '2026-10-14')]);
+
+      final first = _provider(handler);
+      await first.loadInterruptions();
+      expect(first.isFromCache, isFalse);
+      // Saving to the phone happens in the background, so give it a moment.
+      await pumpEventQueue();
+
+      offline = true;
+      final restarted = _provider(handler);
+      await restarted.loadInterruptions();
+
+      expect(restarted.allInterruptions.map((i) => i.id), ['1', '2']);
+      expect(restarted.hasLoaded, isTrue);
+      expect(restarted.isFromCache, isTrue);
+      expect(restarted.error, isNotNull, reason: 'the screen can still say it could not refresh');
+      expect(restarted.lastUpdated, isNotNull);
+    });
+
+    test('with nothing saved, an offline first load shows the error and no data', () async {
+      final provider = _provider((_) async => throw http.ClientException('no route'));
+
+      await provider.loadInterruptions();
+
+      expect(provider.allInterruptions, isEmpty);
+      expect(provider.hasLoaded, isFalse);
+      expect((provider.errorDetails as ApiException).kind, ApiErrorKind.offline);
+    });
   });
 }

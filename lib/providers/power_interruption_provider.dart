@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:suga/models/power_interruption.dart';
@@ -29,10 +31,14 @@ class PowerInterruptionProvider extends ChangeNotifier {
   bool _isSaving = false;
   bool _hasLoaded = false;
   String? _error;
+  Object? _errorDetails;
   String? _actionError;
   Map<String, String> _fieldErrors = const {};
   Future<void>? _pendingLoad;
   bool _disposed = false;
+  DateTime? _lastUpdated;
+  bool _areasRestored = false;
+  bool _fromCache = false;
 
   Future<void> _loadAreaPreferences() async {
     try {
@@ -56,6 +62,9 @@ class PowerInterruptionProvider extends ChangeNotifier {
       _notify();
     } catch (e) {
       debugPrint('Could not load saved areas: $e');
+    } finally {
+      _areasRestored = true;
+      _notify();
     }
   }
 
@@ -96,8 +105,22 @@ class PowerInterruptionProvider extends ChangeNotifier {
   bool get isSaving => _isSaving;
   bool get hasLoaded => _hasLoaded;
 
+  // When the advisories last loaded successfully. Shown as "Updated 2:14 PM".
+  DateTime? get lastUpdated => _lastUpdated;
+
+  // False while the saved areas are being read at startup.
+  bool get areasRestored => _areasRestored;
+
   // Why the last load failed. The list keeps the last data that loaded successfully.
   String? get error => _error;
+
+  // The exception behind [error], so screens can word it for the kind of failure
+  // (offline, timeout, server problem). Null when the last load worked.
+  Object? get errorDetails => _errorDetails;
+
+  // True when the list on screen was read from the phone because the server
+  // could not be reached on startup.
+  bool get isFromCache => _fromCache;
 
   // Why the last add, update or delete failed, e.g. for a SnackBar.
   String? get actionError => _actionError;
@@ -115,28 +138,40 @@ class PowerInterruptionProvider extends ChangeNotifier {
   List<PowerInterruption> interruptionsForArea(int areaId) =>
       _all.where((item) => item.areaIds.contains(areaId)).toList();
 
-  bool hasPowerInArea(int areaId) {
-    final now = DateTime.now().toUtc();
-
-    final hasActiveOutage = interruptionsForArea(areaId).any((item) {
-      final status = item.status.trim().toLowerCase();
-
-      if (status == 'cancelled' ||
-          status == 'canceled' ||
-          status == 'completed') {
-        return false;
-      }
-
-      final start = advisoryStart(item);
-      final end = advisoryEnd(item);
-
-      if (start == null || end == null) return false;
-
-      return !now.isBefore(start.toUtc()) && now.isBefore(end.toUtc());
-    });
-
-    return !hasActiveOutage;
+  // A brownout is happening now when an admin marked it ongoing and the current
+  // time is inside its start and end time. Scheduled, restored and cancelled
+  // advisories never count.
+  static bool isOutageNow(PowerInterruption item, DateTime now) {
+    if (item.status.trim().toLowerCase() != 'ongoing') return false;
+    final start = advisoryStart(item);
+    var end = advisoryEnd(item);
+    if (start == null || end == null) return false;
+    // An end time earlier than the start means it runs past midnight.
+    if (!end.isAfter(start)) end = end.add(const Duration(days: 1));
+    return !now.isBefore(start) && now.isBefore(end);
   }
+
+  // The brownout happening in this area right now, if any.
+  PowerInterruption? currentOutage(int areaId) {
+    final now = DateTime.now();
+    for (final item in interruptionsForArea(areaId)) {
+      if (isOutageNow(item, now)) return item;
+    }
+    return null;
+  }
+
+  // The next scheduled brownout in this area that has not started yet.
+  PowerInterruption? nextOutage(int areaId) {
+    final now = DateTime.now();
+    for (final item in interruptionsForArea(areaId)) {
+      if (item.status.trim().toLowerCase() != 'scheduled') continue;
+      final start = advisoryStart(item);
+      if (start != null && start.isAfter(now)) return item;
+    }
+    return null;
+  }
+
+  bool hasPowerInArea(int areaId) => currentOutage(areaId) == null;
 
   PowerInterruption? findById(String id) {
     for (final item in _all) {
@@ -213,15 +248,68 @@ class PowerInterruptionProvider extends ChangeNotifier {
   Future<void> _load() async {
     _isLoading = true;
     _error = null;
+    _errorDetails = null;
     _notify();
     try {
       _all = _sorted(await _service.fetchInterruptions());
       _hasLoaded = true;
+      _fromCache = false;
+      _lastUpdated = DateTime.now();
+      unawaited(_saveCache());
     } on ApiException catch (e) {
       _error = e.message;
+      _errorDetails = e;
+    } catch (e) {
+      // Anything unexpected must end as an error message, never an unhandled crash.
+      debugPrint('Could not load interruptions: $e');
+      _error = friendlyError(e);
+      _errorDetails = e;
     } finally {
       _isLoading = false;
       _notify();
+    }
+    // First load failed (offline, server down): fall back to the last saved list.
+    if (_error != null && !_hasLoaded) await _restoreCache();
+  }
+
+  // The last list that loaded is kept on the phone, so a cold start without a
+  // connection still shows the advisories people saw before.
+  static const _kCache = 'advisories.cache';
+
+  Future<void> _saveCache() async {
+    try {
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+      await prefs.setString(
+        _kCache,
+        jsonEncode({
+          'savedAt': DateTime.now().toUtc().toIso8601String(),
+          'items': [for (final item in _all) item.toJson()],
+        }),
+      );
+    } catch (e) {
+      debugPrint('Could not save the advisory cache: $e');
+    }
+  }
+
+  Future<void> _restoreCache() async {
+    try {
+      final prefs = _prefs ??= await SharedPreferences.getInstance();
+      final text = prefs.getString(_kCache);
+      if (text == null) return;
+      final cached = jsonDecode(text) as Map<String, dynamic>;
+      final items = [
+        for (final row in cached['items'] as List<dynamic>)
+          PowerInterruption.fromJson(row as Map<String, dynamic>),
+      ];
+      // A load that finished while this was reading wins over the old copy.
+      if (_hasLoaded) return;
+      _all = _sorted(items);
+      _hasLoaded = true;
+      _fromCache = true;
+      _lastUpdated = DateTime.tryParse('${cached['savedAt']}')?.toLocal();
+      _notify();
+    } catch (e) {
+      debugPrint('Could not read the advisory cache: $e');
     }
   }
 

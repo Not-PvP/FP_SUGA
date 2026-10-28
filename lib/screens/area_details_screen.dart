@@ -1,14 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:suga/models/area.dart';
-import 'package:suga/services/area_service.dart';
 import 'package:provider/provider.dart';
+import 'package:suga/models/area.dart';
+import 'package:suga/models/power_interruption.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
+import 'package:suga/services/area_service.dart';
+import 'package:suga/theme/app_theme.dart';
+import 'package:suga/utils/advisory_time.dart';
+import 'package:suga/utils/format.dart';
 import 'package:suga/widgets/power_status_widget.dart';
+import 'package:suga/widgets/ui.dart';
 import 'package:suga/widgets/weather_card.dart';
 import 'package:suga/widgets/upcoming_advisories_widget.dart';
-import 'package:suga/utils/advisory_time.dart';
-import 'package:timezone/timezone.dart' as tz;
 
+// One area: its power status, feeders and upcoming brownouts.
+// Pops with true when the user sets it as their home area.
 class AreaDetailsScreen extends StatefulWidget {
   const AreaDetailsScreen({super.key, this.service});
 
@@ -20,287 +25,188 @@ class AreaDetailsScreen extends StatefulWidget {
 
 class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
   late final AreaService _service = widget.service ?? AreaService();
+  int? _id;
   Future<Area>? _area;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
     // Receives the area id from the Areas screen.
-    final id = ModalRoute.of(context)!.settings.arguments as int;
-    _area ??= _service.fetchArea(id);
+    _id ??= ModalRoute.of(context)!.settings.arguments as int;
+    _area ??= _service.fetchArea(_id!);
   }
 
-  void _setAsMyArea(Area area) {
+  void _retry() {
+    setState(() {
+      _area = _service.fetchArea(_id!);
+    });
+  }
+
+  void _setAsHome(Area area) {
     context.read<PowerInterruptionProvider>().setAreaFilter(area.id);
-    Navigator.pop(context);
+    Navigator.pop(context, true);
   }
 
-  void _toggleFavorite(Area area) {
+  void _toggleSaved(Area area, bool saved) {
     context.read<PowerInterruptionProvider>().toggleSavedArea(area.id);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(saved ? 'Removed ${area.name} from saved areas' : 'Saved ${area.name}'),
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF070A0F),
-      extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        forceMaterialTransparency: true,
-        toolbarHeight: 90,
-        titleSpacing: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: FutureBuilder<Area>(
-          future: _area,
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) {
-              return const SizedBox.shrink();
-            }
+    return FutureBuilder<Area>(
+      future: _area,
+      builder: (context, snapshot) {
+        final area = snapshot.data;
+        return Scaffold(
+          appBar: AppBar(actions: [if (area != null) _buildSaveButton(context, area)]),
+          body: _buildBody(context, snapshot),
+        );
+      },
+    );
+  }
 
-            final area = snapshot.data!;
-
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  area.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  area.city,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFFFBF00),
-                    fontSize: 13,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
-
-        actions: [
-          FutureBuilder<Area>(
-            future: _area,
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const SizedBox.shrink();
-              }
-
-              final provider = context.watch<PowerInterruptionProvider>();
-              final isFavorite = provider.savedAreaIds.contains(
-                snapshot.data!.id,
-              );
-
-              return IconButton(
-                onPressed: () => _toggleFavorite(snapshot.data!),
-                icon: Icon(
-                  isFavorite ? Icons.favorite : Icons.favorite_border,
-                  color: Color(0xFFFFBF00),
-                  size: 26,
-                ),
-                tooltip: isFavorite
-                    ? 'Remove from favorites'
-                    : 'Add to favorites',
-              );
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
+  // Takes the FutureBuilder's context, so context.watch runs during that build.
+  Widget _buildSaveButton(BuildContext context, Area area) {
+    final provider = context.watch<PowerInterruptionProvider>();
+    final isHome = provider.selectedAreaId == area.id;
+    final saved = provider.savedAreaIds.contains(area.id);
+    return IconButton(
+      onPressed: isHome ? null : () => _toggleSaved(area, saved),
+      tooltip: isHome
+          ? 'Your home area is always saved'
+          : saved
+              ? 'Remove from saved areas'
+              : 'Save area',
+      icon: Icon(
+        saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+        color: isHome ? AppColors.textMuted : AppColors.amber,
       ),
-      body: FutureBuilder<Area>(
-        future: _area,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('${snapshot.error}'));
-          }
-          final area = snapshot.data!;
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(16, 110, 16, 16),
-            children: [
-              PowerStatusWidget(areaId: area.id),
+    );
+  }
 
-              const SizedBox(height: 24),
+  Widget _buildBody(BuildContext context, AsyncSnapshot<Area> snapshot) {
+    if (snapshot.connectionState != ConnectionState.done) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (snapshot.hasError) {
+      return ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          ErrorPanel(
+            what: 'this area',
+            error: snapshot.error!,
+            onRetry: _retry,
+          ),
+        ],
+      );
+    }
 
-              WeatherCard(
-                latitude: area.latitude,
-                longitude: area.longitude,
-                locationName: area.name,
-              ),
+    final area = snapshot.data!;
+    final isHome = context.watch<PowerInterruptionProvider>().selectedAreaId == area.id;
 
-              const SizedBox(height: 24),
-
-              const Text(
-                'FEEDER STATUS',
-                style: TextStyle(
-                  color: Color(0xFF9CA3AF),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
+      children: [
+        Semantics(header: true, child: Text(area.name, style: AppText.screenTitle)),
+        const SizedBox(height: 4),
+        Text(
+          area.city,
+          style: AppText.body.copyWith(color: AppColors.amber, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 8),
+        PowerStatusWidget(areaId: area.id, bulbSize: 150),
+        const SizedBox(height: 24),
+        WeatherCard(
+          latitude: area.latitude,
+          longitude: area.longitude,
+          locationName: area.name,
+        ),
+        const SizedBox(height: 32),
+        const SectionLabel('Feeders'),
+        if (area.feeders.isEmpty)
+          const Text('No feeders listed for this area.', style: AppText.muted)
+        else
+          SugaCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                for (var i = 0; i < area.feeders.length; i++) ...[
+                  if (i > 0) const Divider(),
+                  _FeederRow(area: area, feeder: area.feeders[i]),
+                ],
+              ],
+            ),
+          ),
+        const SizedBox(height: 32),
+        UpcomingAdvisoriesWidget(
+          areaIds: {area.id},
+          emptyMessage: 'No brownouts are scheduled in ${area.name}.',
+        ),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: isHome
+              ? OutlinedButton.icon(
+                  onPressed: null,
+                  icon: const Icon(Icons.home_rounded, size: 20),
+                  label: const Text('This is your home area'),
+                )
+              : ElevatedButton.icon(
+                  onPressed: () => _setAsHome(area),
+                  icon: const Icon(Icons.home_outlined, size: 20),
+                  label: const Text('Set as home area'),
                 ),
-              ),
+        ),
+      ],
+    );
+  }
+}
 
-              const SizedBox(height: 12),
+// A feeder and whether it is affected by a brownout now or soon.
+class _FeederRow extends StatelessWidget {
+  const _FeederRow({required this.area, required this.feeder});
 
-              if (area.feeders.isEmpty)
-                const Text(
-                  'No feeders listed for this area.',
-                  style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-                ),
+  final Area area;
+  final Feeder feeder;
 
-              for (final feeder in area.feeders)
-                Builder(
-                  builder: (context) {
-                    final interruptions = context
-                        .watch<PowerInterruptionProvider>()
-                        .allInterruptions;
+  // An advisory without feeders listed affects the whole area.
+  bool _affects(PowerInterruption item) =>
+      (item.feederIds.isEmpty && item.feeders.isEmpty) ||
+      item.feederIds.contains(feeder.id) ||
+      item.feeders.contains(feeder.name);
 
-                    final currentTime = tz.TZDateTime.now(manila);
+  @override
+  Widget build(BuildContext context) {
+    final provider = context.watch<PowerInterruptionProvider>();
+    Widget? pill;
+    if (provider.hasLoaded) {
+      final outage = provider.currentOutage(area.id);
+      final next = UpcomingAdvisoriesWidget.upcoming(provider.interruptionsForArea(area.id))
+          .where(_affects)
+          .firstOrNull;
+      final nextStart = next == null ? null : advisoryStart(next);
+      if (outage != null && _affects(outage)) {
+        pill = const StatusPill(label: 'Brownout now', color: AppColors.outage);
+      } else if (nextStart != null) {
+        pill = StatusPill(
+          label: 'Brownout ${lowerFirst(timeUntil(nextStart, DateTime.now()))}',
+          color: AppColors.amber,
+        );
+      } else {
+        pill = const StatusPill(label: 'Power on', color: AppColors.powerOn);
+      }
+    }
 
-                    final isUnavailable = interruptions.any((item) {
-                      final status = item.status.trim().toLowerCase();
-
-                      if (status == 'cancelled' ||
-                          status == 'canceled' ||
-                          status == 'completed') {
-                        return false;
-                      }
-
-                      final affectsFeeder = item.feederIds.isNotEmpty
-                          ? item.feederIds.contains(feeder.id)
-                          : item.areaIds.contains(area.id);
-
-                      if (!affectsFeeder) return false;
-
-                      final start = advisoryStart(item);
-                      final end = advisoryEnd(item);
-
-                      if (start == null || end == null) return false;
-
-                      return !currentTime.isBefore(start) &&
-                          currentTime.isBefore(end);
-                    });
-
-                    final statusColor = isUnavailable
-                        ? const Color(0xFFF87171)
-                        : const Color(0xFF86EFAC);
-
-                    final statusBackground = isUnavailable
-                        ? const Color(0xFF35191C)
-                        : const Color(0xFF14271E);
-
-                    final statusBorder = isUnavailable
-                        ? const Color(0xFF8B343B)
-                        : const Color(0xFF347653);
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 10),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 16,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF111720),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFF292F38)),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: BoxDecoration(
-                              color: isUnavailable
-                                  ? const Color(0xFFF87171)
-                                  : const Color(0xFF4ADE80),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              feeder.name,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 5,
-                            ),
-                            decoration: BoxDecoration(
-                              color: statusBackground,
-                              border: Border.all(color: statusBorder),
-                              borderRadius: BorderRadius.circular(30),
-                            ),
-                            child: Text(
-                              isUnavailable ? 'Unavailable' : 'Operational',
-                              style: TextStyle(
-                                color: statusColor,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
-
-              const SizedBox(height: 24),
-
-              UpcomingAdvisoriesWidget(areaId: area.id),
-
-              const SizedBox(height: 24),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => _setAsMyArea(area),
-                  icon: const Icon(Icons.location_on_outlined, size: 20),
-                  label: const Text('Set as My Area'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFBF00),
-                    foregroundColor: const Color(0xFF070A0F),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Row(
+        children: [
+          Expanded(child: Text(feeder.name, style: AppText.cardTitle)),
+          if (pill != null) ...[const SizedBox(width: 8), Flexible(child: pill)],
+        ],
       ),
     );
   }

@@ -12,6 +12,7 @@ import 'package:suga/screens/scheduled_brownouts_screen.dart';
 import 'package:suga/services/auth_service.dart';
 import 'package:suga/services/interruption_service.dart';
 import 'package:suga/services/session_storage.dart';
+import 'package:suga/widgets/status_badge.dart';
 
 Widget _app(http.Response Function(http.Request) handler, {AdminSession? signedIn}) {
   final client = MockClient((r) async => handler(r));
@@ -82,7 +83,7 @@ void main() {
                 'title': 'Jaro Power Interruption',
                 'affected_areas': ['Jaro, Iloilo City'],
                 'area_ids': [3],
-                'date': '2026-10-12',
+                'date': '2099-10-12',
                 'start_time': '09:00',
                 'end_time': '14:00',
                 'status': 'scheduled',
@@ -135,6 +136,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Molo Cancelled Work'), findsOneWidget);
-    expect(find.text('Cancelled'), findsOneWidget);
+    // "Cancelled" is also a filter chip, so look for the badge on the card itself.
+    expect(find.widgetWithText(StatusBadge, 'Cancelled'), findsOneWidget);
   });
 }

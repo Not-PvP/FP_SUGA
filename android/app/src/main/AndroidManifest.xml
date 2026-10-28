@@ -2,9 +2,12 @@
     <!-- Brownout reminders (flutter_local_notifications). POST_NOTIFICATIONS comes from
          the plugin; boot completed lets it put reminders back after a restart. -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- The API calls fail in a release build without this (debug/profile manifests add it by themselves). -->
+    <uses-permission android:name="android.permission.INTERNET"/>
 
     <application
-        android:label="suga"
+        android:label="SUGA"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

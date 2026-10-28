@@ -5,7 +5,8 @@ import 'package:suga/models/power_interruption.dart';
 import 'package:suga/providers/auth_provider.dart';
 import 'package:suga/providers/power_interruption_provider.dart';
 import 'package:suga/routes/app_routes.dart';
-import 'package:suga/widgets/status_badge.dart';
+import 'package:suga/widgets/advisory_card.dart';
+import 'package:suga/widgets/ui.dart';
 import 'package:suga/widgets/upcoming_advisories_widget.dart';
 
 enum _DateRange { any, today, next7, thisMonth, past }
@@ -27,6 +28,10 @@ class _Filters {
   final _DateRange range;
 }
 
+enum _Scope { myAreas, allAreas }
+
+// Scheduled tab: every upcoming brownout, grouped by day. Signed-in admins can
+// also switch to every advisory, with search and filters.
 class ScheduledBrownoutsScreen extends StatefulWidget {
   const ScheduledBrownoutsScreen({super.key});
 
@@ -36,6 +41,9 @@ class ScheduledBrownoutsScreen extends StatefulWidget {
 }
 
 class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
+  // Users with saved areas see only those first; they can switch to every area.
+  _Scope _scope = _Scope.myAreas;
+
   // Admin only: also list ongoing, restored, cancelled and past advisories,
   // so they can be opened and updated.
   bool _showAll = false;
@@ -220,55 +228,12 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
   }
 
   Widget _buildAdminToggle() {
-    Widget option(String label, bool all) {
-      final selected = _showAll == all;
-      return Expanded(
-        child: InkWell(
-          onTap: () => setState(() => _showAll = all),
-          borderRadius: BorderRadius.circular(10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected ? const Color(0xFF292315) : Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: selected
-                    ? const Color(0xFFFFBF00).withValues(alpha: 0.5)
-                    : Colors.transparent,
-              ),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: selected
-                    ? const Color(0xFFFFBF00)
-                    : const Color(0xFF9CA3AF),
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: const Color(0xFF111720),
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: const Color(0xFF292F38)),
-        ),
-        child: Row(
-          children: [
-            option('Upcoming', false),
-            const SizedBox(width: 4),
-            option('All advisories', true),
-          ],
-        ),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+      child: SegmentedTabs<bool>(
+        options: const [(false, 'Upcoming'), (true, 'All advisories')],
+        value: _showAll,
+        onChanged: (all) => setState(() => _showAll = all),
       ),
     );
   }
@@ -478,7 +443,7 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
 
   Widget _buildControls(List<PowerInterruption> items) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 12, 24, 4),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
       child: Column(
         children: [
           Row(
@@ -526,44 +491,18 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
 
   Widget _buildAllAdvisories(List<PowerInterruption> all) {
     if (all.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 24),
-        child: Text(
-          'No advisories yet.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-        ),
-      );
+      return const StatePanel(icon: Icons.inbox_outlined, title: 'No advisories yet');
     }
 
     final items = _apply(all);
 
     if (items.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 32),
-        child: Column(
-          children: [
-            const Icon(
-              Icons.search_off_rounded,
-              color: Color(0xFFFFBF00),
-              size: 32,
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              'No advisories match your search.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-            ),
-            if (_anythingActive)
-              TextButton(
-                onPressed: _clearAll,
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFFFBF00),
-                ),
-                child: const Text('Clear filters'),
-              ),
-          ],
-        ),
+      return StatePanel(
+        icon: Icons.search_off_rounded,
+        title: 'No advisories match your search',
+        message: 'Try a different search or clear the filters.',
+        actionLabel: _anythingActive ? 'Clear filters' : null,
+        onAction: _anythingActive ? _clearAll : null,
       );
     }
 
@@ -571,73 +510,11 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
       children: [
         for (final item in items)
           Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: Material(
-              color: const Color(0xFF111720),
-              borderRadius: BorderRadius.circular(16),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () => Navigator.pushNamed(
-                  context,
-                  AppRoutes.brownoutDetails,
-                  arguments: item,
-                ),
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: const Color(0xFF292F38)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              item.title,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _formatWhen(item),
-                              style: const TextStyle(
-                                color: Color(0xFF9CA3AF),
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      StatusBadge(status: item.status),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            padding: const EdgeInsets.only(bottom: 12),
+            child: AdvisoryCard(advisory: item, showStatus: true),
           ),
       ],
     );
-  }
-
-  static String _formatWhen(PowerInterruption item) {
-    try {
-      final date = DateFormat('MMM d, y').format(DateTime.parse(item.date));
-      final start = DateFormat(
-        'h:mm a',
-      ).format(DateFormat('HH:mm').parse(item.startTime));
-      final end = DateFormat(
-        'h:mm a',
-      ).format(DateFormat('HH:mm').parse(item.endTime));
-      return '$date · $start – $end';
-    } catch (_) {
-      return '${item.date} · ${item.startTime} – ${item.endTime}';
-    }
   }
 
   @override
@@ -646,6 +523,9 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
     final items = provider.allInterruptions;
     final isAdmin = context.watch<AuthProvider>().isSignedIn;
     final showAll = isAdmin && _showAll;
+    final followed = {...provider.savedAreaIds, ?provider.selectedAreaId};
+    final canFilter = followed.isNotEmpty && !showAll;
+    final onlyMine = canFilter && _scope == _Scope.myAreas;
 
     final Widget body;
     if (items.isEmpty &&
@@ -653,31 +533,42 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
         provider.error == null) {
       body = const Center(child: CircularProgressIndicator());
     } else if (items.isEmpty && provider.error != null) {
-      body = Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(provider.error!, textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: provider.loadInterruptions,
-              child: const Text('Retry'),
-            ),
-          ],
-        ),
+      body = ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          ErrorPanel(
+            what: 'brownouts',
+            error: provider.errorDetails!,
+            onRetry: provider.loadInterruptions,
+          ),
+        ],
       );
     } else {
       body = RefreshIndicator(
         onRefresh: provider.loadInterruptions,
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
           children: [
+            // The list below is the last one that loaded, so say it may be out of date.
+            if (provider.error != null) ...[
+              InlineNotice(
+                icon: Icons.cloud_off_rounded,
+                message: "Couldn't refresh. Showing the list from when it last loaded.",
+                actionLabel: 'Retry',
+                onAction: provider.loadInterruptions,
+              ),
+              const SizedBox(height: 12),
+            ],
             showAll
                 ? _buildAllAdvisories(items)
-                : const UpcomingAdvisoriesWidget(
+                : UpcomingAdvisoriesWidget(
+                    areaIds: onlyMine ? followed : null,
                     showHeader: false,
                     groupByDate: true,
+                    emptyMessage: onlyMine
+                        ? 'Nothing scheduled in your saved areas. Switch to All areas to see the rest of the city.'
+                        : null,
                   ),
           ],
         ),
@@ -685,80 +576,52 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFF070A0F),
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  const Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Scheduled Brownouts',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        SizedBox(height: 6),
-                        Text(
-                          'Stay informed about upcoming power interruptions.',
-                          style: TextStyle(
-                            color: Color(0xFF9CA3AF),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ],
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Expanded(
+                  child: ScreenHeader(
+                    title: 'Scheduled brownouts',
+                    subtitle: 'Upcoming power interruptions, soonest first.',
+                  ),
+                ),
+                if (isAdmin)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 20, top: 8),
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final result = await Navigator.pushNamed(
+                          context,
+                          AppRoutes.brownoutForm,
+                        );
+
+                        if (result == true && context.mounted) {
+                          await context
+                              .read<PowerInterruptionProvider>()
+                              .loadInterruptions();
+                        }
+                      },
+                      child: const Text('+ Add'),
                     ),
                   ),
-                  if (isAdmin) ...[
-                    const SizedBox(width: 12),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: OutlinedButton(
-                        onPressed: () async {
-                          final result = await Navigator.pushNamed(
-                            context,
-                            AppRoutes.brownoutForm,
-                          );
-
-                          if (result == true && context.mounted) {
-                            await context
-                                .read<PowerInterruptionProvider>()
-                                .loadInterruptions();
-                          }
-                        },
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFFFBF00),
-                          side: const BorderSide(color: Color(0xFFFFBF00)),
-                          backgroundColor: const Color(0xFF292315),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                          textStyle: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        child: const Text('+ Add'),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+              ],
             ),
+            if (canFilter)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                child: SegmentedTabs<_Scope>(
+                  options: const [
+                    (_Scope.myAreas, 'My areas'),
+                    (_Scope.allAreas, 'All areas'),
+                  ],
+                  value: _scope,
+                  onChanged: (scope) => setState(() => _scope = scope),
+                ),
+              ),
 
             // Only signed-in admins see this switch.
             if (isAdmin) _buildAdminToggle(),
@@ -766,7 +629,6 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
             // Search and filters appear only on All Advisories.
             if (showAll) _buildControls(items),
 
-            // Existing loading, error, or brownout list
             Expanded(child: body),
           ],
         ),
