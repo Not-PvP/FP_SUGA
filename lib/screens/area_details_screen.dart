@@ -65,7 +65,6 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
     return FutureBuilder<Area>(
       future: _area,
       builder: (context, snapshot) {
-        final area = snapshot.data;
         return Scaffold(
           appBar: AppBar(title: const Text('Area Details')),
           body: _buildBody(context, snapshot),

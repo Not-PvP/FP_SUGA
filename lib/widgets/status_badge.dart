@@ -12,7 +12,7 @@ class StatusBadge extends StatelessWidget {
         'scheduled' => AppColors.planned,
         'ongoing' => AppColors.outage,
         'restored' => AppColors.powerOn,
-        'cancelled' || 'canceled' => AppColors.textMuted,
+        'cancelled' => AppColors.textMuted,
         _ => AppColors.textMuted,
       };
 

@@ -136,7 +136,6 @@ class NotificationBuilder {
           actionLabel: 'Brownout details',
         );
       case 'cancelled':
-      case 'canceled':
         return make(
           NotificationKind.cancelled,
           time: changed,

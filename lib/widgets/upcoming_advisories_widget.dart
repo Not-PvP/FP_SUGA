@@ -44,7 +44,7 @@ class UpcomingAdvisoriesWidget extends StatelessWidget {
     final time = now ?? DateTime.now();
     return items.where((item) {
       final status = item.status.toLowerCase();
-      if (status == 'cancelled' || status == 'canceled' || status == 'restored' || status == 'ongoing') {
+      if (status == 'cancelled' || status == 'restored' || status == 'ongoing') {
         return false;
       }
       if (areaIds != null && !item.areaIds.any(areaIds.contains)) return false;

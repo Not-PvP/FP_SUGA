@@ -262,7 +262,7 @@ void main() {
   testWidgets('admin tools show only to a signed-in admin', (tester) async {
     await _run(tester, _FakeApi(), (_) async {
       await _tap(tester, find.text('Scheduled'));
-      expect(find.text('+ Add'), findsNothing);
+      expect(find.text('Add'), findsNothing);
       expect(find.text('All advisories'), findsNothing);
     });
 
@@ -273,7 +273,7 @@ void main() {
     );
     await _run(tester, _FakeApi(), (_) async {
       await _tap(tester, find.text('Scheduled'));
-      expect(find.text('+ Add'), findsOneWidget);
+      expect(find.text('Add'), findsOneWidget);
       expect(find.text('All advisories'), findsOneWidget);
     }, admin: session);
   });
