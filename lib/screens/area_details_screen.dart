@@ -49,9 +49,15 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
 
   void _toggleSaved(Area area, bool saved) {
     context.read<PowerInterruptionProvider>().toggleSavedArea(area.id);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(saved ? 'Removed ${area.name} from saved areas' : 'Saved ${area.name}'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          saved
+              ? 'Removed ${area.name} from saved areas'
+              : 'Saved ${area.name}',
+        ),
+      ),
+    );
   }
 
   @override
@@ -61,7 +67,7 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
       builder: (context, snapshot) {
         final area = snapshot.data;
         return Scaffold(
-          appBar: AppBar(actions: [if (area != null) _buildSaveButton(context, area)]),
+          appBar: AppBar(title: const Text('Area Details')),
           body: _buildBody(context, snapshot),
         );
       },
@@ -78,8 +84,8 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
       tooltip: isHome
           ? 'Your home area is always saved'
           : saved
-              ? 'Remove from saved areas'
-              : 'Save area',
+          ? 'Remove from saved areas'
+          : 'Save area',
       icon: Icon(
         saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
         color: isHome ? AppColors.textMuted : AppColors.amber,
@@ -105,18 +111,40 @@ class _AreaDetailsScreenState extends State<AreaDetailsScreen> {
     }
 
     final area = snapshot.data!;
-    final isHome = context.watch<PowerInterruptionProvider>().selectedAreaId == area.id;
+    final isHome =
+        context.watch<PowerInterruptionProvider>().selectedAreaId == area.id;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
       children: [
-        Semantics(header: true, child: Text(area.name, style: AppText.screenTitle)),
-        const SizedBox(height: 4),
-        Text(
-          area.city,
-          style: AppText.body.copyWith(color: AppColors.amber, fontWeight: FontWeight.w600),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Semantics(
+                    header: true,
+                    child: Text(area.name, style: AppText.screenTitle),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    area.city,
+                    style: AppText.body.copyWith(
+                      color: AppColors.amber,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            _buildSaveButton(context, area),
+          ],
         ),
         const SizedBox(height: 8),
+
         PowerStatusWidget(areaId: area.id, bulbSize: 150),
         const SizedBox(height: 24),
         WeatherCard(
@@ -184,9 +212,9 @@ class _FeederRow extends StatelessWidget {
     Widget? pill;
     if (provider.hasLoaded) {
       final outage = provider.currentOutage(area.id);
-      final next = UpcomingAdvisoriesWidget.upcoming(provider.interruptionsForArea(area.id))
-          .where(_affects)
-          .firstOrNull;
+      final next = UpcomingAdvisoriesWidget.upcoming(
+        provider.interruptionsForArea(area.id),
+      ).where(_affects).firstOrNull;
       final nextStart = next == null ? null : advisoryStart(next);
       if (outage != null && _affects(outage)) {
         pill = const StatusPill(label: 'Brownout now', color: AppColors.outage);
@@ -205,7 +233,10 @@ class _FeederRow extends StatelessWidget {
       child: Row(
         children: [
           Expanded(child: Text(feeder.name, style: AppText.cardTitle)),
-          if (pill != null) ...[const SizedBox(width: 8), Flexible(child: pill)],
+          if (pill != null) ...[
+            const SizedBox(width: 8),
+            Flexible(child: pill),
+          ],
         ],
       ),
     );

@@ -8,6 +8,7 @@ import 'package:suga/routes/app_routes.dart';
 import 'package:suga/widgets/advisory_card.dart';
 import 'package:suga/widgets/ui.dart';
 import 'package:suga/widgets/upcoming_advisories_widget.dart';
+import 'package:suga/widgets/status_badge.dart';
 
 enum _DateRange { any, today, next7, thisMonth, past }
 
@@ -464,22 +465,22 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
                 _statusChip(
                   label: 'Scheduled',
                   value: 'scheduled',
-                  dot: const Color(0xFFFBBF24),
+                  dot: StatusBadge.colorFor('scheduled'),
                 ),
                 _statusChip(
                   label: 'Ongoing',
                   value: 'ongoing',
-                  dot: const Color(0xFFF97316),
+                  dot: StatusBadge.colorFor('ongoing'),
                 ),
                 _statusChip(
                   label: 'Restored',
                   value: 'restored',
-                  dot: const Color(0xFF34D399),
+                  dot: StatusBadge.colorFor('restored'),
                 ),
                 _statusChip(
                   label: 'Cancelled',
                   value: 'cancelled',
-                  dot: const Color(0xFFF87171),
+                  dot: StatusBadge.colorFor('cancelled'),
                 ),
               ],
             ),
@@ -491,7 +492,10 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
 
   Widget _buildAllAdvisories(List<PowerInterruption> all) {
     if (all.isEmpty) {
-      return const StatePanel(icon: Icons.inbox_outlined, title: 'No advisories yet');
+      return const StatePanel(
+        icon: Icons.inbox_outlined,
+        title: 'No advisories yet',
+      );
     }
 
     final items = _apply(all);
@@ -554,7 +558,8 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
             if (provider.error != null) ...[
               InlineNotice(
                 icon: Icons.cloud_off_rounded,
-                message: "Couldn't refresh. Showing the list from when it last loaded.",
+                message:
+                    "Couldn't refresh. Showing the list from when it last loaded.",
                 actionLabel: 'Retry',
                 onAction: provider.loadInterruptions,
               ),
@@ -592,8 +597,8 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
                 if (isAdmin)
                   Padding(
                     padding: const EdgeInsets.only(right: 20, top: 8),
-                    child: OutlinedButton(
-                      onPressed: () async {
+                    child: InkWell(
+                      onTap: () async {
                         final result = await Navigator.pushNamed(
                           context,
                           AppRoutes.brownoutForm,
@@ -605,7 +610,43 @@ class _ScheduledBrownoutsScreenState extends State<ScheduledBrownoutsScreen> {
                               .loadInterruptions();
                         }
                       },
-                      child: const Text('+ Add'),
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(
+                            0xFFFFBF00,
+                          ).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: const Color(
+                              0xFFFFBF00,
+                            ).withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.add_rounded,
+                              size: 14,
+                              color: Color(0xFFFFBF00),
+                            ),
+                            SizedBox(width: 4),
+                            Text(
+                              'Add',
+                              style: TextStyle(
+                                color: Color(0xFFFFBF00),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
               ],
