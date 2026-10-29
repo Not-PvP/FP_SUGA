@@ -15,7 +15,7 @@ SUGA is a Flutter mobile application that helps users monitor scheduled power in
 - [Configuration](#configuration)
 - [Testing](#testing)
 - [Release Build](#release-build)
-- [Debugging and Performance](#debugging-and-performance)
+- [Debugging and Error Handling](#debugging-and-error-handling)
 - [Known Limitations](#known-limitations)
 - [Development Team](#development-team)
 - [Contributing](#contributing)
@@ -111,7 +111,7 @@ FP_SUGA/
 ├── docs/
 │   ├── screenshots/             # Application screenshots
 │   ├── RELEASE.md               # Release and submission checklist
-│   └── devtools-debugging.md    # Debugging review and DevTools checklist
+│   └── devtools-debugging.md    # Debugging case and supporting evidence
 ├── lib/
 │   ├── models/                  # Data models
 │   ├── providers/               # Provider state management
@@ -455,22 +455,25 @@ Install and test the APK on a physical device. Verify that the API is reachable,
 
 For signing, versioning, installation, and the submission checklist, see [`docs/RELEASE.md`](docs/RELEASE.md).
 
-## Debugging and Performance
+## Debugging and Error Handling
 
-The project includes [`docs/devtools-debugging.md`](docs/devtools-debugging.md), which documents a static code review and a performance-related fix.
+The project includes [`docs/devtools-debugging.md`](docs/devtools-debugging.md), which documents a debugging case involving stale feeder selections when editing a brownout advisory.
 
-The review identified repeated API requests caused by creating a `Future` inside the brownout details screen's `build()` method. The future was moved into `_AdvisoryWeatherState` so it is created once instead of being recreated on every rebuild.
+### Stale Feeder Selections
 
-The documentation also contains a Flutter DevTools checklist for examining network requests, widget rebuilds, frame performance, memory behavior, and error handling.
+When an administrator removed an affected area from an existing brownout advisory, the application could fail to save the changes because a feeder ID associated with the removed area remained in the form's selected feeder IDs.
 
-**Status:** The static review and code fix are documented. The DevTools runtime checklist still needs to be completed with actual observations and screenshots before claiming that the runtime performance investigation has been fully verified.
+The issue was identified during application testing using VS Code's Run and Debug feature. The debug output showed a backend validation error indicating that feeder ID `10` did not belong to any of the remaining affected areas.
+
+**Fix implemented:** The area's `onDeleted` callback in `lib/screens/brownout_form_screen.dart` was updated to remove feeder selections that no longer correspond to the remaining affected areas while preserving valid selections.
+
+**Verification:** After the fix, the advisory was successfully updated. The debugging documentation includes screenshots of the validation error and the successful save.
 
 ## Known Limitations
 
 - **Sample data:** Seeded advisories and development data are for testing and are not official utility announcements.
 - **Backend availability:** The application needs a reachable backend to retrieve current server data. Offline behavior depends on the app's implemented caching and error-handling paths.
 - **Notifications:** Local reminders depend on device permissions, operating-system behavior, and the app's notification configuration. SMS functionality should not be considered available unless separately implemented and verified.
-- **DevTools evidence:** The static code review is documented, but the runtime DevTools checklist still needs evidence from a device or emulator.
 - **Large administrator lists:** The documented static review notes that the administrator's all-advisories list builds rows eagerly. A lazy list may be preferable if the number of advisories grows substantially.
 
 ## Development Team
