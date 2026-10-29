@@ -146,7 +146,7 @@ class BrownoutDetailsScreen extends StatelessWidget {
                       const SizedBox(height: 4),
                       Text(
                         DateFormat(
-                          'MMMM, d, yyyy',
+                          'MMMM d, yyyy',
                         ).format(DateTime.parse(brownout.date)),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
