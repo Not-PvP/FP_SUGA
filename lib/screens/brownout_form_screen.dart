@@ -217,11 +217,39 @@ class _BrownoutFormScreenState extends State<BrownoutFormScreen> {
       initialTime: current ?? const TimeOfDay(hour: 9, minute: 0),
       builder: _pickerTheme,
     );
+
     if (picked == null || !mounted) return;
+
+    // Reject an end time that is not later than the start time.
+    if (errorKey == 'end_time' &&
+        _start != null &&
+        _minutes(picked) <= _minutes(_start!)) {
+      setState(() {
+        _localErrors = {
+          ..._localErrors,
+          'end_time': 'End time must be later than the start time.',
+        };
+        _serverErrors = {..._serverErrors}..remove('end_time');
+      });
+      return;
+    }
+
     setState(() {
       assign(picked);
       _clearError(errorKey);
-      if (errorKey == 'start_time') _clearError('end_time');
+
+      if (errorKey == 'start_time') {
+        _clearError('end_time');
+
+        // Clear the existing end time if the new start time makes it invalid.
+        if (_end != null && _minutes(_end!) <= _minutes(_start!)) {
+          _end = null;
+          _localErrors = {
+            ..._localErrors,
+            'end_time': 'Choose an end time later than the start time.',
+          };
+        }
+      }
     });
   }
 
