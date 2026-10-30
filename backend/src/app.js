@@ -20,3 +20,7 @@ export function createApp() {
   app.use(errorHandler);
   return app;
 }
+
+// Vercel looks for a default export (an Express app) in this file.
+// index.js still starts a local server with createApp().listen(...).
+export default createApp();
